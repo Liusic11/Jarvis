@@ -21,7 +21,7 @@
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | 1 | 仓库骨架与配置基础设施 | ✅ 已完成 |
-| 2 | Home Assistant 与可复现虚拟家庭 | 未开始 |
+| 2 | Home Assistant 与可复现虚拟家庭 | 🟡 进行中（虚拟家庭已建好，未提交；待接 HA 令牌） |
 | 3 | 拓扑配置与 HomeAssistantClient | 未开始 |
 | 4 | 工具层 | 未开始 |
 | 5 | 场景 | 未开始 |
@@ -32,6 +32,7 @@
 
 详细的阶段计划与验收标准见 [`docs/PHASES.md`](docs/PHASES.md)。
 架构设计与决策理由见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+**给非工程背景的学习笔记（讲人话、每次做完工作一篇）见 [`docs/LEARN.md`](docs/LEARN.md)。**
 
 ---
 
@@ -95,8 +96,7 @@ docker compose ps            # 等状态变成 healthy
 首次启动需要 1–3 分钟。之后打开 <http://localhost:8123> 完成首次引导，
 创建长期访问令牌（左下角用户名 → 安全 → 创建令牌），填进 `.env` 的 `JARVIS_HA_TOKEN`。
 
-> HA 配置存在 Docker named volume 里，不在宿主机目录 —— Windows/WSL2 下 bind mount
-> 的小文件 I/O 很慢，而 HA 重度读写 SQLite。备份用 `scripts/ha_export.sh`（Phase 2 提供）。
+> HA 配置通过 **bind mount** 直接挂在宿主机 `homeassistant/config/`（非 named volume），改 YAML 即时生效，无需导出脚本。
 
 ### 3. 启动 JARVIS
 
@@ -134,7 +134,7 @@ curl http://localhost:8000/api/health
 uv run pytest                          # 跑测试（不需要 HA 或 Ollama）
 uv run ruff check .                    # 静态检查
 docker compose logs -f homeassistant   # 看 HA 日志
-docker compose down                    # 停 HA（配置保留在 volume 中）
+docker compose down                    # 停 HA（YAML 配置保留在宿主机 homeassistant/config/，不受影响）
 ```
 
 ---
@@ -142,12 +142,12 @@ docker compose down                    # 停 HA（配置保留在 volume 中）
 ## 仓库结构（概览）
 
 ```
-config/           home_topology.yaml（设备映射唯一真相）、scenes.yaml
+config/           home_topology.yaml（Phase 3 起：设备映射唯一真相）、scenes.yaml（Phase 5 起）
 homeassistant/    HA 配置与 virtual_home.yaml（可复现的虚拟家庭）
 src/jarvis/       llm / ha / home / tools / agent / memory / api / web
 tests/            单元测试与集成测试
 scripts/          初始化、HA 配置导出导入等辅助脚本
-docs/             ARCHITECTURE.md、PHASES.md
+docs/             ARCHITECTURE.md、PHASES.md、LEARN.md（学习笔记，见 learn/ 子目录）
 ```
 
 ---

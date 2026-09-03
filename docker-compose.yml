@@ -17,11 +17,14 @@ services:
     ports:
       - "8123:8123"
 
-    # 用 named volume 而不是宿主机目录挂载：
-    # Windows/WSL2 下跨文件系统小文件 I/O 很慢，而 HA 重度读写 SQLite。
-    # 可复现性由 scripts/ha_export.sh / ha_import.sh 保证，不靠 bind mount。
+    # 绑定挂载宿主机上的配置目录（HA 官方推荐做法）：
+    #   - 容器直接读取 homeassistant/config/ 下的 configuration.yaml 与 packages/
+    #   - 改 YAML 后 HA 可热重载，开发迭代最方便
+    #   - 运行时状态（home-assistant_v2.db / .storage 等）也落在宿主机，
+    #     这些已在 .gitignore 中排除，不会进版本库
+    # 注意：Docker Desktop 需要已开启对该盘的文件共享（Settings → Resources → File Sharing）。
     volumes:
-      - ha-config:/config
+      - ./homeassistant/config:/config
 
     environment:
       # 只用 TZ 环境变量设置时区，不挂载 /etc/localtime（Windows 上不存在该路径）
@@ -50,5 +53,7 @@ services:
       TZ: Asia/Shanghai
 
 volumes:
-  ha-config:
+  # Ollama 模型数据用 named volume（容器内路径，无法绑定挂载到 Windows）。
+  # HA 配置目录改用上面 ./homeassistant/config 绑定挂载，便于开发迭代。
   ollama-models:
+    name: jarvis-ollama-models

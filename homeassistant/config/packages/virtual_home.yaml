@@ -1,0 +1,289 @@
+# ─────────────────────────────────────────────────────────────
+# JARVIS 虚拟家庭（纯 YAML，可复现）
+#
+# 设计：
+#   1. input_boolean / input_number / input_select 作为「状态载体」，
+#      它们本身就是可提交的配置实体，是虚拟设备的唯一真相来源。
+#   2. template: 集成从上面这些载体派生出「真正的」设备领域实体：
+#      light / cover / lock / vacuum / sensor / binary_sensor / switch。
+#   3. climate（空调）用 generic_thermostat 承载 —— template 集成
+#      不支持 climate 平台，故以 input_boolean 作电源开关、
+#      template 温度 sensor 作温度来源，挂在顶层 climate: 下。
+#   4. 将来换成真实设备时，只需在 HA 侧配对真实设备，
+#      并把 topology 映射改到新 entity_id —— 本文件整体可丢弃。
+#
+# 重要约束（见 docs/PHASES.md）：
+#   **禁止通过 HA UI 创建任何实体**。本文件即全部虚拟家庭定义，
+#   fresh clone + `docker compose up -d` 即可重建完全一致的环境。
+# ─────────────────────────────────────────────────────────────
+
+# ── 状态载体：开关类 ────────────────────────────────────────
+input_boolean:
+  lr_light:    { name: "客厅灯",      initial: off }
+  br_light:    { name: "卧室灯",      initial: off }
+  st_light:    { name: "书房灯",      initial: off }
+  kt_light:    { name: "厨房灯",      initial: off }
+  lr_ac:       { name: "客厅空调",    initial: off }
+  br_ac:       { name: "卧室空调",    initial: off }
+  st_ac:       { name: "书房空调",    initial: off }
+  lr_curtain:  { name: "客厅窗帘",    initial: off }
+  br_curtain:  { name: "卧室窗帘",    initial: off }
+  lr_tv:       { name: "客厅电视",    initial: off }
+  en_lock:     { name: "大门门锁",    initial: off }   # off = 上锁
+  lr_presence: { name: "客厅有人",    initial: off }
+  br_presence: { name: "卧室有人",    initial: off }
+  st_presence: { name: "书房有人",    initial: off }
+  kt_presence: { name: "厨房有人",    initial: off }
+  en_presence: { name: "门口有人",    initial: off }
+
+# ── 状态载体：数值类（仅保留「当前温度」，目标温度由 climate 实体自身持有） ──
+input_number:
+  lr_light_bri: { name: "客厅灯亮度", min: 0, max: 100, step: 1, initial: 100, unit_of_measurement: "%" }
+  br_light_bri: { name: "卧室灯亮度", min: 0, max: 100, step: 1, initial: 80,  unit_of_measurement: "%" }
+  st_light_bri: { name: "书房灯亮度", min: 0, max: 100, step: 1, initial: 100, unit_of_measurement: "%" }
+  kt_light_bri: { name: "厨房灯亮度", min: 0, max: 100, step: 1, initial: 100, unit_of_measurement: "%" }
+  lr_temp_cur:  { name: "客厅当前温度", min: 0, max: 50, step: 0.5, initial: 22.5, unit_of_measurement: "°C" }
+  br_temp_cur:  { name: "卧室当前温度", min: 0, max: 50, step: 0.5, initial: 21.0, unit_of_measurement: "°C" }
+  st_temp_cur:  { name: "书房当前温度", min: 0, max: 50, step: 0.5, initial: 23.0, unit_of_measurement: "°C" }
+  kt_temp_cur:  { name: "厨房当前温度", min: 0, max: 50, step: 0.5, initial: 20.0, unit_of_measurement: "°C" }
+
+# ── 状态载体：选择类（扫地机状态） ──────────────────────────
+input_select:
+  vacuum_state:
+    name: "扫地机器人状态"
+    options: ["docked", "idle", "cleaning"]
+    initial: docked
+
+# ── 派生实体：灯光（亮度以 0–100% 存储，模板内换算成 HA 的 0–255） ──
+template:
+  - light:
+      - name: "Living Room Light"
+        unique_id: jarvis_light_lr
+        state: "{{ is_state('input_boolean.lr_light','on') }}"
+        level: "{{ ((states('input_number.lr_light_bri') | int(0)) * 255 / 100) | int }}"
+        turn_on:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.lr_light }
+          - service: input_number.set_value
+            target: { entity_id: input_number.lr_light_bri }
+            data:
+              value: "{{ ((brightness * 100 / 255) | int) if brightness is defined else 100 }}"
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.lr_light }
+        set_level:
+          - service: input_number.set_value
+            target: { entity_id: input_number.lr_light_bri }
+            data:
+              value: "{{ (brightness * 100 / 255) | int }}"
+      - name: "Bedroom Light"
+        unique_id: jarvis_light_br
+        state: "{{ is_state('input_boolean.br_light','on') }}"
+        level: "{{ ((states('input_number.br_light_bri') | int(0)) * 255 / 100) | int }}"
+        turn_on:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.br_light }
+          - service: input_number.set_value
+            target: { entity_id: input_number.br_light_bri }
+            data:
+              value: "{{ ((brightness * 100 / 255) | int) if brightness is defined else 100 }}"
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.br_light }
+        set_level:
+          - service: input_number.set_value
+            target: { entity_id: input_number.br_light_bri }
+            data:
+              value: "{{ (brightness * 100 / 255) | int }}"
+      - name: "Study Light"
+        unique_id: jarvis_light_st
+        state: "{{ is_state('input_boolean.st_light','on') }}"
+        level: "{{ ((states('input_number.st_light_bri') | int(0)) * 255 / 100) | int }}"
+        turn_on:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.st_light }
+          - service: input_number.set_value
+            target: { entity_id: input_number.st_light_bri }
+            data:
+              value: "{{ ((brightness * 100 / 255) | int) if brightness is defined else 100 }}"
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.st_light }
+        set_level:
+          - service: input_number.set_value
+            target: { entity_id: input_number.st_light_bri }
+            data:
+              value: "{{ (brightness * 100 / 255) | int }}"
+      - name: "Kitchen Light"
+        unique_id: jarvis_light_kt
+        state: "{{ is_state('input_boolean.kt_light','on') }}"
+        level: "{{ ((states('input_number.kt_light_bri') | int(0)) * 255 / 100) | int }}"
+        turn_on:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.kt_light }
+          - service: input_number.set_value
+            target: { entity_id: input_number.kt_light_bri }
+            data:
+              value: "{{ ((brightness * 100 / 255) | int) if brightness is defined else 100 }}"
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.kt_light }
+        set_level:
+          - service: input_number.set_value
+            target: { entity_id: input_number.kt_light_bri }
+            data:
+              value: "{{ (brightness * 100 / 255) | int }}"
+
+  # ── 派生实体：窗帘（cover） ───────────────────────────────
+  - cover:
+      - name: "Living Room Curtain"
+        unique_id: jarvis_curtain_lr
+        device_class: curtain
+        state: "{{ 'open' if is_state('input_boolean.lr_curtain','on') else 'closed' }}"
+        open_cover:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.lr_curtain }
+        close_cover:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.lr_curtain }
+      - name: "Bedroom Curtain"
+        unique_id: jarvis_curtain_br
+        device_class: curtain
+        state: "{{ 'open' if is_state('input_boolean.br_curtain','on') else 'closed' }}"
+        open_cover:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.br_curtain }
+        close_cover:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.br_curtain }
+
+  # ── 派生实体：电视（media_player 不被 template 支持，用 switch 承载电源） ──
+  - switch:
+      - name: "Living Room TV"
+        unique_id: jarvis_tv_lr
+        state: "{{ is_state('input_boolean.lr_tv','on') }}"
+        turn_on:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.lr_tv }
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.lr_tv }
+
+  # ── 派生实体：大门门锁（lock，高危） ───────────────────────
+  - lock:
+      - name: "Front Door"
+        unique_id: jarvis_lock_front
+        state: "{{ 'locked' if is_state('input_boolean.en_lock','off') else 'unlocked' }}"
+        lock:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.en_lock }
+        unlock:
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.en_lock }
+
+  # ── 派生实体：扫地机器人（vacuum） ────────────────────────
+  - vacuum:
+      - name: "Robot Vacuum"
+        unique_id: jarvis_vacuum
+        state: "{{ states('input_select.vacuum_state') }}"
+        start:
+          - service: input_select.select_option
+            target: { entity_id: input_select.vacuum_state }
+            data: { option: "cleaning" }
+        stop:
+          - service: input_select.select_option
+            target: { entity_id: input_select.vacuum_state }
+            data: { option: "idle" }
+        pause:
+          - service: input_select.select_option
+            target: { entity_id: input_select.vacuum_state }
+            data: { option: "idle" }
+        return_to_base:
+          - service: input_select.select_option
+            target: { entity_id: input_select.vacuum_state }
+            data: { option: "docked" }
+
+  # ── 派生实体：温度传感器（sensor） ─────────────────────────
+  - sensor:
+      - name: "Living Room Temperature"
+        unique_id: jarvis_temp_lr
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.lr_temp_cur') | float(0) }}"
+        availability: "{{ has_value('input_number.lr_temp_cur') }}"
+      - name: "Bedroom Temperature"
+        unique_id: jarvis_temp_br
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.br_temp_cur') | float(0) }}"
+        availability: "{{ has_value('input_number.br_temp_cur') }}"
+      - name: "Study Temperature"
+        unique_id: jarvis_temp_st
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.st_temp_cur') | float(0) }}"
+        availability: "{{ has_value('input_number.st_temp_cur') }}"
+      - name: "Kitchen Temperature"
+        unique_id: jarvis_temp_kt
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.kt_temp_cur') | float(0) }}"
+        availability: "{{ has_value('input_number.kt_temp_cur') }}"
+
+  # ── 派生实体：有人传感器（binary_sensor） ──────────────────
+  - binary_sensor:
+      - name: "Living Room Presence"
+        unique_id: jarvis_presence_lr
+        device_class: occupancy
+        state: "{{ is_state('input_boolean.lr_presence','on') }}"
+      - name: "Bedroom Presence"
+        unique_id: jarvis_presence_br
+        device_class: occupancy
+        state: "{{ is_state('input_boolean.br_presence','on') }}"
+      - name: "Study Presence"
+        unique_id: jarvis_presence_st
+        device_class: occupancy
+        state: "{{ is_state('input_boolean.st_presence','on') }}"
+      - name: "Kitchen Presence"
+        unique_id: jarvis_presence_kt
+        device_class: occupancy
+        state: "{{ is_state('input_boolean.kt_presence','on') }}"
+      - name: "Entrance Presence"
+        unique_id: jarvis_presence_en
+        device_class: occupancy
+        state: "{{ is_state('input_boolean.en_presence','on') }}"
+
+# ── 派生实体：空调（climate，用 generic_thermostat 承载） ────
+# template 集成不支持 climate 平台，故用 generic_thermostat：
+#   heater  -> input_boolean（电源开关）
+#   target_sensor -> 上面的 template 温度 sensor
+#   ac_mode -> 按制冷逻辑驱动开关
+# 目标温度由 climate 实体自身持有（JARVIS 通过 climate.set_temperature 设置）。
+climate:
+  - platform: generic_thermostat
+    name: "Living Room AC"
+    unique_id: jarvis_ac_lr
+    heater: input_boolean.lr_ac
+    target_sensor: sensor.living_room_temperature
+    min_temp: 16
+    max_temp: 30
+    target_temp: 26
+    ac_mode: true
+  - platform: generic_thermostat
+    name: "Bedroom AC"
+    unique_id: jarvis_ac_br
+    heater: input_boolean.br_ac
+    target_sensor: sensor.bedroom_temperature
+    min_temp: 16
+    max_temp: 30
+    target_temp: 26
+    ac_mode: true
+  - platform: generic_thermostat
+    name: "Study AC"
+    unique_id: jarvis_ac_st
+    heater: input_boolean.st_ac
+    target_sensor: sensor.study_temperature
+    min_temp: 16
+    max_temp: 30
+    target_temp: 25
+    ac_mode: true

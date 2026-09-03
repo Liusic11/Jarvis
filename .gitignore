@@ -29,6 +29,9 @@ data/
 logs/
 *.log
 
+# 本机工具数据（不与项目一起分发）
+.workbuddy/
+
 # Home Assistant 运行时状态 —— 不可复现，不提交
 homeassistant/config/.storage/
 homeassistant/config/.cloud
@@ -51,3 +54,7 @@ models/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Home Assistant 运行时生成（非配置，不提交）
+homeassistant/config/.ha_run.lock
+homeassistant/config/blueprints/
