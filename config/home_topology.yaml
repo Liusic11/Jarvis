@@ -1,0 +1,196 @@
+# ─────────────────────────────────────────────────────────────
+# JARVIS 家庭拓扑 —— 逻辑语义层 → entity_id 的唯一映射
+#
+# 【这个文件在整个系统里的地位】
+#   「客厅 + 灯」这种人话，全系统只有这一个地方知道它等于
+#   light.living_room_light。
+#
+# 【为什么要有这一层，而不是让代码直接写 entity_id】
+#   1. 解耦：将来把虚拟设备换成真实设备，entity_id 一定会变。
+#      有这一层就只改本文件，Tools / Agent / 场景一行都不用改。
+#   2. 校验：启动时能逐个检查 entity_id 是否真的存在于 HA，
+#      避免"代码写着能开灯、实际实体不存在"这种运行时才炸的问题。
+#   3. 语义：房间/设备的中文别名集中在这里，规则路由直接查表，
+#      不用在代码里散落一堆 if "客厅" in text。
+#
+# 【约束】
+#   本文件只描述"映射与能力"，不含任何 HA 地址、令牌、绝对路径。
+#
+# 【校验】改完本文件后跑：python scripts/validate_topology.py
+# ─────────────────────────────────────────────────────────────
+
+version: 1
+
+# capabilities（设备能力）说明 —— 工具层据此判断"这个操作允许吗"：
+#   on_off          可开 / 可关
+#   brightness      可调亮度（0–100%）
+#   set_temperature 可设目标温度
+#   open_close      可开合（窗帘）
+#   lock_unlock     可上锁 / 解锁（高危，需二次确认）
+#   start_stop      可启动 / 停止 / 回充（扫地机）
+#   read_only       只读（传感器，不能控制）
+
+rooms:
+  # ── 客厅 ────────────────────────────────────────────────
+  living_room:
+    name: 客厅
+    aliases: [客厅, 大厅, 起居室]
+    devices:
+      light:
+        name: 客厅灯
+        entity_id: light.living_room_light
+        domain: light
+        capabilities: [on_off, brightness]
+        aliases: [灯, 灯光, 照明]
+      curtain:
+        name: 客厅窗帘
+        entity_id: cover.living_room_curtain
+        domain: cover
+        capabilities: [open_close]
+        aliases: [窗帘, 帘子]
+      tv:
+        name: 客厅电视
+        entity_id: switch.living_room_tv
+        domain: switch
+        capabilities: [on_off]
+        aliases: [电视, 电视机]
+      ac:
+        name: 客厅空调
+        entity_id: climate.living_room_ac
+        domain: climate
+        capabilities: [on_off, set_temperature]
+        aliases: [空调, 冷气]
+      temperature:
+        name: 客厅温度
+        entity_id: sensor.living_room_temperature
+        domain: sensor
+        capabilities: [read_only]
+        aliases: [温度, 气温, 几度, 多少度]
+      presence:
+        name: 客厅有人
+        entity_id: binary_sensor.living_room_presence
+        domain: binary_sensor
+        capabilities: [read_only]
+        aliases: [有人, 在不在]
+
+  # ── 卧室 ────────────────────────────────────────────────
+  bedroom:
+    name: 卧室
+    aliases: [卧室, 睡房, 房间]
+    devices:
+      light:
+        name: 卧室灯
+        entity_id: light.bedroom_light
+        domain: light
+        capabilities: [on_off, brightness]
+        aliases: [灯, 灯光, 照明]
+      curtain:
+        name: 卧室窗帘
+        entity_id: cover.bedroom_curtain
+        domain: cover
+        capabilities: [open_close]
+        aliases: [窗帘, 帘子]
+      ac:
+        name: 卧室空调
+        entity_id: climate.bedroom_ac
+        domain: climate
+        capabilities: [on_off, set_temperature]
+        aliases: [空调, 冷气]
+      temperature:
+        name: 卧室温度
+        entity_id: sensor.bedroom_temperature
+        domain: sensor
+        capabilities: [read_only]
+        aliases: [温度, 气温, 几度, 多少度]
+      presence:
+        name: 卧室有人
+        entity_id: binary_sensor.bedroom_presence
+        domain: binary_sensor
+        capabilities: [read_only]
+        aliases: [有人, 在不在]
+
+  # ── 书房 ────────────────────────────────────────────────
+  study:
+    name: 书房
+    aliases: [书房, 工作室, 办公]
+    devices:
+      light:
+        name: 书房灯
+        entity_id: light.study_light
+        domain: light
+        capabilities: [on_off, brightness]
+        aliases: [灯, 灯光, 照明]
+      ac:
+        name: 书房空调
+        entity_id: climate.study_ac
+        domain: climate
+        capabilities: [on_off, set_temperature]
+        aliases: [空调, 冷气]
+      temperature:
+        name: 书房温度
+        entity_id: sensor.study_temperature
+        domain: sensor
+        capabilities: [read_only]
+        aliases: [温度, 气温, 几度, 多少度]
+      presence:
+        name: 书房有人
+        entity_id: binary_sensor.study_presence
+        domain: binary_sensor
+        capabilities: [read_only]
+        aliases: [有人, 在不在]
+
+  # ── 厨房 ────────────────────────────────────────────────
+  kitchen:
+    name: 厨房
+    aliases: [厨房]
+    devices:
+      light:
+        name: 厨房灯
+        entity_id: light.kitchen_light
+        domain: light
+        capabilities: [on_off, brightness]
+        aliases: [灯, 灯光, 照明]
+      temperature:
+        name: 厨房温度
+        entity_id: sensor.kitchen_temperature
+        domain: sensor
+        capabilities: [read_only]
+        aliases: [温度, 气温, 几度, 多少度]
+      presence:
+        name: 厨房有人
+        entity_id: binary_sensor.kitchen_presence
+        domain: binary_sensor
+        capabilities: [read_only]
+        aliases: [有人, 在不在]
+
+  # ── 门口（玄关）──────────────────────────────────────────
+  entrance:
+    name: 门口
+    aliases: [门口, 玄关, 大门, 入口]
+    devices:
+      lock:
+        name: 大门门锁
+        entity_id: lock.front_door
+        domain: lock
+        capabilities: [lock_unlock]
+        aliases: [门锁, 锁, 门]
+      presence:
+        name: 门口有人
+        entity_id: binary_sensor.entrance_presence
+        domain: binary_sensor
+        capabilities: [read_only]
+        aliases: [有人, 在不在]
+
+  # ── 全屋（不归属某个房间的设备）────────────────────────────
+  # 扫地机会满屋跑，硬塞进某个房间没有意义，
+  # 所以用一个"伪房间"承载全屋级设备，保持 resolve(room, device) 接口统一。
+  household:
+    name: 全屋
+    aliases: [全屋, 家里, 全家]
+    devices:
+      vacuum:
+        name: 扫地机器人
+        entity_id: vacuum.robot_vacuum
+        domain: vacuum
+        capabilities: [start_stop]
+        aliases: [扫地机, 扫地机器人, 机器人]

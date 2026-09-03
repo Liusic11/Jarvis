@@ -111,6 +111,33 @@ curl -H "Authorization: Bearer $HA_TOKEN" http://localhost:8123/api/states
 - 拓扑 YAML 中引用的每个 entity_id 都能在真实 HA 中存在（写一个校验脚本跑一遍）
 - 代码中全局搜索确认：**除 `ha/client.py` 外没有任何地方出现 HTTP 调用**
 
+### 状态：✅ 已完成（2026-09-03）
+
+**实测结果（全部对真实 HA 验证过）**
+
+```bash
+.venv/Scripts/python.exe -m pytest -q     # 73 passed（含 Phase 1 的 22 个，无回归）
+.venv/Scripts/python.exe scripts/validate_topology.py
+# ✓ 全部 21 个 entity_id 都在 HA 中存在
+```
+
+| 验收项 | 结果 |
+|---|---|
+| 单元测试全绿（不依赖 HA 容器） | ✅ 73 passed，8 秒跑完 |
+| `resolve("living_room","light")` | ✅ 返回 `light.living_room_light` |
+| `resolve("nonexistent_room","light")` | ✅ 返回 `Resolution(ok=False, error="unknown_room")`，不抛异常 |
+| 每个 entity_id 在真实 HA 中存在 | ✅ 21/21 通过（`scripts/validate_topology.py`） |
+| 只有 `ha/client.py` 发 HTTP | ✅ grep 确认（另两处为文档字符串与日志器名） |
+| 真实控制设备 | ✅ 冒烟：`turn_on → state=on → turn_off → state=off`，温度读得 22.5 °C |
+
+**与计划的偏差（如实记录）**
+
+- 原计划 "`ha/client.py`：REST **+ WebSocket**"。本期**只实现了 REST**。
+  理由：Phase 4–7（工具、场景、记忆、规则路由）全部用 REST 轮询即可满足，
+  WebSocket 属于"实时事件推送"的增强，放到真正需要事件流 / SSE 时再补。
+  刻意不为了对齐文档而做一半用不上的东西。
+- 额外补充：`pyproject.toml` 显式声明了 `pyyaml`（此前只是 uvicorn 的传递依赖）。
+
 ---
 
 ## Phase 4 — 工具层

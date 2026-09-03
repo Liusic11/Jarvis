@@ -16,13 +16,13 @@
 
 ## 当前状态
 
-**Phase 1 已完成** —— 仓库骨架、配置系统、日志、健康检查、Docker Compose（Home Assistant）。
+**Phase 1–3 已完成** —— 仓库骨架与配置系统、可复现虚拟家庭（21 个虚拟设备）、拓扑语义层与 Home Assistant 客户端（73 个测试全绿，已对真实 HA 验证）。
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | 1 | 仓库骨架与配置基础设施 | ✅ 已完成 |
-| 2 | Home Assistant 与可复现虚拟家庭 | 🟡 进行中（虚拟家庭已建好，未提交；待接 HA 令牌） |
-| 3 | 拓扑配置与 HomeAssistantClient | 未开始 |
+| 2 | Home Assistant 与可复现虚拟家庭 | ✅ 已完成 |
+| 3 | 拓扑配置与 HomeAssistantClient | ✅ 已完成 |
 | 4 | 工具层 | 未开始 |
 | 5 | 场景 | 未开始 |
 | 6 | 记忆（SQLite） | 未开始 |

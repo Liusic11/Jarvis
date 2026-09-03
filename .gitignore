@@ -58,3 +58,4 @@ Thumbs.db
 # Home Assistant 运行时生成（非配置，不提交）
 homeassistant/config/.ha_run.lock
 homeassistant/config/blueprints/
+homeassistant/config/.cache/

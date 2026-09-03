@@ -50,17 +50,20 @@ Home Assistant（运行在 Docker 里的智能家居中枢）
 
 > 这是你的硬要求，我每次都更新这段。
 
-**已经能做的（截至 2026-09-03）**：
+**已经能做的（截至 2026-09-03，Phase 3 完成）**：
 - ✅ 项目骨架已建好，能跨机器复现（环境变量 + 配置文件驱动，无硬编码）。
 - ✅ Home Assistant 容器已在 Docker 里跑起来（端口 8123，状态 healthy）。
 - ✅ 一个**虚拟家庭**已在 HA 里注册完成：4 灯、3 空调、2 窗帘、1 电视、1 门锁、1 扫地机、4 温度传感器、5 有人传感器，共 21 个"真 domain"实体。
-- ✅ 配置系统、健康检查、Stub LLM、HA 客户端骨架、22 个测试已就绪。
-- ✅ 仓库里 `uv run pytest` 能跑通，HA 容器探活正常。
+- ✅ **JARVIS 已连上 HA**（`.env` 里写入真实长期令牌，实测能拉到全部实体）。
+- ✅ **拓扑语义层**：能用「客厅 + 灯」查出 entity_id；查不到时返回结构化错误而不崩溃。
+- ✅ **HA 客户端**：能读任意实体状态，也能调服务**真正改变设备**——实测「开灯→关灯」状态确实翻转，温度读到 22.5 °C。
+- ✅ **73 个测试全绿**，且全部不需要 HA 容器（靠测试替身，8 秒跑完）。
 
 **还做不到的（卡点 / 未做）**：
-- ❌ 还不能「对话控制」设备——因为 JARVIS 应用还没连上 HA（缺 HA 长期令牌，写入 `.env` 属于你的红线操作，需你确认后才做）。
+- ❌ 还不能「对话控制」设备——控制设备的能力已经具备，但**还缺"听懂人话"的入口**，那是 **Phase 7 的规则路由**。
 - ❌ 还没有真实 LLM 接入（现在用 Stub 假模型，只验证链路，不真听懂人话）。
 - ❌ 还没有 Web 界面、场景、记忆库等（这些是 Phase 5 以后的事）。
+- ⚠️ 已知偏差：Phase 3 只做了 REST，**未做 WebSocket**（Phase 4–7 用轮询即可满足），已在 `PHASES.md` 如实标注。
 
 ---
 
@@ -104,10 +107,10 @@ Home Assistant（运行在 Docker 里的智能家居中枢）
 ### 已完成（可阅读）
 - [`00-foundations.md`](learn/00-foundations.md) — **技术通识基础**：Docker / HTTP·REST / API / FastAPI / YAML / Home Assistant / LLM·tool calling / WebSocket / 环境变量，含「打开客厅灯」完整串讲
 - [`01-phase1-repo-skeleton.md`](learn/01-phase1-repo-skeleton.md) — 仓库骨架、配置系统、健康检查、Stub LLM、HA 客户端骨架、22 测试（已提交 commit `1267388`）
-- [`02-phase2-virtual-home.md`](learn/02-phase2-virtual-home.md) — 用纯 YAML 造出 21 个虚拟设备，HA 容器跑起来（已落盘，未提交）
+- [`02-phase2-virtual-home.md`](learn/02-phase2-virtual-home.md) — 用纯 YAML 造出 21 个虚拟设备，HA 容器跑起来（已提交 commit `5a0d740`）
+- [`03-phase3-topology-client.md`](learn/03-phase3-topology-client.md) — **拓扑语义层 + 真正的 HA 客户端**：一次讲透 6 个概念（映射层 / Protocol / 结构化结果 / 幂等重试 / 测试替身 / 防腐层），结尾有完整旅程串讲
 
 ### 计划中（进度推进时新增）
-- `03-phase3-topology-and-client.md` — 拓扑配置 + 真正的 HA 客户端（连上设备）
 - `04-phase4-tools.md` — 工具层（开灯/调温等标准化动作）
 - `05-phase5-scenes.md` — 场景（"电影模式"一键联动）
 - `06-phase6-memory.md` — 记忆库（SQLite）
