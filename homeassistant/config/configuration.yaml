@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────
+# Home Assistant 配置（Phase 1：最小引导版）
+#
+# Phase 2 会在这里引入 packages/virtual_home.yaml，
+# 用纯 YAML 定义整套虚拟设备。
+#
+# 注意：.storage/、home-assistant_v2.db 等运行时状态不会提交，
+# 虚拟家庭的可复现性由 virtual_home.yaml 保证。
+# ─────────────────────────────────────────────────────────────
+
+default_config:
+
+homeassistant:
+  name: JARVIS Home
+  # 经纬度、海拔等位置信息属于环境专属配置，
+  # 不写死在这里；需要时在未提交的 secrets.yaml 中通过 !secret 引入。
+
+logger:
+  default: info
+  logs:
+    homeassistant.core: warning

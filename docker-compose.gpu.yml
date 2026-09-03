@@ -1,0 +1,18 @@
+# ─────────────────────────────────────────────────────────────
+# 可选：为容器内的 Ollama 开启 NVIDIA GPU
+#
+# 用法（有显卡的机器，且已装 NVIDIA Container Toolkit）：
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile full up -d
+#
+# 无显卡的机器不要用这个文件，直接用主 compose 或宿主机原生 Ollama。
+# ─────────────────────────────────────────────────────────────
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

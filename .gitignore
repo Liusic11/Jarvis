@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# 测试与工具缓存
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# 环境变量与密钥 —— 绝不提交
+.env
+.env.*
+!.env.example
+*.token
+secrets.yaml
+
+# 运行时数据
+data/
+*.db
+*.db-wal
+*.db-shm
+logs/
+*.log
+
+# Home Assistant 运行时状态 —— 不可复现，不提交
+homeassistant/config/.storage/
+homeassistant/config/.cloud
+homeassistant/config/deps/
+homeassistant/config/tts/
+homeassistant/config/home-assistant_v2.db
+homeassistant/config/home-assistant_v2.db-*
+homeassistant/config/home-assistant.log*
+homeassistant/config/OZW_Log.txt
+homeassistant/config/.HA_VERSION
+
+# 模型文件
+models/
+*.gguf
+*.bin
+*.safetensors
+
+# 编辑器与操作系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

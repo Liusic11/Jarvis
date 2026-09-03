@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────
+# JARVIS 本地基础设施
+#
+# 默认只起 Home Assistant —— JARVIS 本体在本机用 uvicorn 跑，
+# 这样改代码能热重载、能断点调试。
+#
+# 有 NVIDIA 显卡的机器想顺带把 Ollama 也放容器里：
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile full up -d
+# ─────────────────────────────────────────────────────────────
+
+services:
+  homeassistant:
+    container_name: jarvis-homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+
+    ports:
+      - "8123:8123"
+
+    # 用 named volume 而不是宿主机目录挂载：
+    # Windows/WSL2 下跨文件系统小文件 I/O 很慢，而 HA 重度读写 SQLite。
+    # 可复现性由 scripts/ha_export.sh / ha_import.sh 保证，不靠 bind mount。
+    volumes:
+      - ha-config:/config
+
+    environment:
+      # 只用 TZ 环境变量设置时区，不挂载 /etc/localtime（Windows 上不存在该路径）
+      TZ: Asia/Shanghai
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8123/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      # HA 首次启动较慢，给足引导时间
+      start_period: 180s
+
+  # 仅在使用 --profile full 时启动。
+  # 更推荐的做法是在宿主机原生安装 Ollama（见 README），容器版作为备选。
+  ollama:
+    profiles: ["full"]
+    container_name: jarvis-ollama
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      TZ: Asia/Shanghai
+
+volumes:
+  ha-config:
+  ollama-models:
