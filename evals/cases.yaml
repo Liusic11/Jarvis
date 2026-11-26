@@ -1,0 +1,170 @@
+# ─────────────────────────────────────────────────────────────
+# JARVIS 评测集 —— 一句话 → 期望调用的工具和参数
+#
+# 【用途】
+#   步骤 2：配合 scripts/spike_llm_routing.py 量出小模型选工具的准确率
+#   Phase 7：scripts/run_evals.py --strategy rule 量规则路由的准确率与覆盖率
+#   Phase 8：scripts/run_evals.py --strategy llm / auto
+#
+# 【约定】
+#   - room 写房间的中文名（与 config/home_topology.yaml 的 name 一致）
+#   - expect.tool 为 null 表示负例：这句话不该调用任何工具
+#   - 不放「房间不存在」「参数越界」的用例，那两种情况交给单元测试
+#
+# 当前：36 条 = 30 条正例（覆盖 18 个给模型看的工具，其中 8 条口语化）
+#       + 6 条负例。unlock_front_door 不给模型看，所以不在正例里。
+# ─────────────────────────────────────────────────────────────
+
+cases:
+  # ── 灯 ──────────────────────────────────────────────────
+  - id: light_on_living
+    text: 打开客厅灯
+    expect: { tool: turn_on_light, args: { room: 客厅 } }
+
+  - id: light_on_bedroom_casual          # 口语化 1
+    text: 帮我开一下卧室灯
+    expect: { tool: turn_on_light, args: { room: 卧室 } }
+
+  - id: light_off_living
+    text: 把客厅灯关了
+    expect: { tool: turn_off_light, args: { room: 客厅 } }
+
+  - id: light_off_kitchen
+    text: 关掉厨房灯
+    expect: { tool: turn_off_light, args: { room: 厨房 } }
+
+  - id: light_brightness_living
+    text: 客厅灯调到50%
+    expect: { tool: set_light_brightness, args: { room: 客厅, brightness: 50 } }
+
+  - id: light_brightness_living_casual   # 口语化 2
+    text: 客厅有点暗，把灯调到70%
+    expect: { tool: set_light_brightness, args: { room: 客厅, brightness: 70 } }
+
+  - id: light_brightness_bedroom
+    text: 把卧室灯调到30%
+    expect: { tool: set_light_brightness, args: { room: 卧室, brightness: 30 } }
+
+  # ── 空调 ────────────────────────────────────────────────
+  - id: ac_on_bedroom
+    text: 打开卧室空调
+    expect: { tool: turn_on_ac, args: { room: 卧室 } }
+
+  - id: ac_on_living_casual             # 口语化 3
+    text: 太热了，客厅空调开一下
+    expect: { tool: turn_on_ac, args: { room: 客厅 } }
+
+  - id: ac_temp_bedroom
+    text: 卧室空调调到24度
+    expect: { tool: set_ac, args: { room: 卧室, temperature: 24 } }
+
+  - id: ac_temp_study_casual             # 口语化 4
+    text: 书房空调设成二十六度吧
+    expect: { tool: set_ac, args: { room: 书房, temperature: 26 } }
+
+  - id: ac_off_study
+    text: 把书房空调关掉
+    expect: { tool: turn_off_ac, args: { room: 书房 } }
+
+  - id: ac_off_living
+    text: 客厅空调关了
+    expect: { tool: turn_off_ac, args: { room: 客厅 } }
+
+  # ── 窗帘 ────────────────────────────────────────────────
+  - id: curtain_open_living
+    text: 打开客厅窗帘
+    expect: { tool: open_curtain, args: { room: 客厅 } }
+
+  - id: curtain_close_bedroom
+    text: 关上卧室窗帘
+    expect: { tool: close_curtain, args: { room: 卧室 } }
+
+  # ── 电视 ────────────────────────────────────────────────
+  - id: tv_on
+    text: 打开客厅电视
+    expect: { tool: turn_on_tv, args: {} }
+
+  - id: tv_off_casual                   # 口语化 5
+    text: 电视不看了，关掉
+    expect: { tool: turn_off_tv, args: {} }
+
+  # ── 门锁 ────────────────────────────────────────────────
+  - id: lock_front_door
+    text: 把大门锁上
+    expect: { tool: lock_front_door, args: {} }
+
+  - id: lock_front_door_casual           # 口语化 6
+    text: 帮我把大门锁上，我要出门了
+    expect: { tool: lock_front_door, args: {} }
+
+  # ── 传感器 ──────────────────────────────────────────────
+  - id: temp_living
+    text: 客厅温度是多少
+    expect: { tool: get_temperature, args: { room: 客厅 } }
+
+  - id: temp_bedroom_casual             # 口语化 7
+    text: 卧室现在几度
+    expect: { tool: get_temperature, args: { room: 卧室 } }
+
+  - id: temp_kitchen
+    text: 厨房多少度
+    expect: { tool: get_temperature, args: { room: 厨房 } }
+
+  - id: presence_bedroom
+    text: 卧室有人吗
+    expect: { tool: get_presence, args: { room: 卧室 } }
+
+  - id: presence_study
+    text: 看看书房有没有人
+    expect: { tool: get_presence, args: { room: 书房 } }
+
+  # ── 扫地机 ──────────────────────────────────────────────
+  - id: vacuum_start
+    text: 扫地机开始打扫
+    expect: { tool: vacuum_start, args: {} }
+
+  - id: vacuum_stop_casual               # 口语化 8
+    text: 扫地机别扫了
+    expect: { tool: vacuum_stop, args: {} }
+
+  - id: vacuum_dock
+    text: 让扫地机回去充电
+    expect: { tool: vacuum_return_to_dock, args: {} }
+
+  # ── 状态汇总 ────────────────────────────────────────────
+  - id: room_state_living
+    text: 客厅现在什么情况
+    expect: { tool: get_room_state, args: { room: 客厅 } }
+
+  - id: home_state
+    text: 家里现在什么情况
+    expect: { tool: get_home_state, args: {} }
+
+  - id: home_state_alias
+    text: 全屋的设备都什么状态
+    expect: { tool: get_home_state, args: {} }
+
+  # ── 负例：不该调用任何工具 ───────────────────────────────
+  - id: chat_greet
+    text: 你好
+    expect: { tool: null, args: {} }
+
+  - id: chat_weather
+    text: 今天天气怎么样
+    expect: { tool: null, args: {} }
+
+  - id: chat_joke
+    text: 给我讲个笑话
+    expect: { tool: null, args: {} }
+
+  - id: chat_name
+    text: 你叫什么名字
+    expect: { tool: null, args: {} }
+
+  - id: chat_food
+    text: 帮我订个外卖
+    expect: { tool: null, args: {} }
+
+  - id: chat_thanks
+    text: 谢谢你
+    expect: { tool: null, args: {} }

@@ -355,7 +355,7 @@ Ollama 为可选项：需要真模型时安装本机 Ollama 并 `./scripts/pull_
 |---|---|---|
 | 虚拟灯（template） | 真实智能灯 | `home_topology.yaml` + HA 配对 |
 | 虚拟传感器 | 真实传感器 | 同上 |
-| Web 聊天 | 麦克风 + 唤醒词 | 新增输入适配器，Agent 接口不变 |
+| Web 聊天 | 成品音箱（Siri 快捷指令 / 小爱）作为输入适配器 | 文字进、一句回复出的对话接口（Phase 10），Agent 接口不变 |
 | 本机 PC | 专用 AI 服务器 / GPU 服务器 | `OLLAMA_URL` + `MODEL_NAME` |
 | 虚拟扫地机 | 真实扫地机 | `home_topology.yaml` + HA 集成 |
 | 虚拟 HA | 真实 HA 安装 | `HA_URL` + `HA_TOKEN` |
