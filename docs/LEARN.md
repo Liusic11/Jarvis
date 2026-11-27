@@ -14,7 +14,7 @@
 | 文档 | 给谁看 | 内容 |
 |---|---|---|
 | `docs/ARCHITECTURE.md` | 工程师 | 架构决策与理由（偏技术，有出入时以代码为准） |
-| `docs/PHASES.md` | 工程师/规划 | 9 个阶段的计划与验收标准 |
+| `docs/PHASES.md` | 工程师/规划 | 阶段计划与验收标准 |
 | **`docs/LEARN.md` + `docs/learn/*.md`** | **你（Mike）** | **用大白话讲「在干什么、为什么、你能怎么动手」**，并如实标注文档与代码的偏差 |
 
 **建议阅读顺序**：
@@ -26,23 +26,38 @@
 
 ## 1. JARVIS 一句话心智模型
 
+JARVIS 是一个长期演进的个人 AI Agent，智能家居是它的第一个应用场景。一句话概括：**harness 提供脑子，插件是管家的手脚，身份靠启动时注入的 system prompt。**
+
+四条原则，用大白话说：
+
+- **解耦**：各管各的，靠接口说话，别互相翻对方的抽屉。
+- **可迁移**：不绑死某个模型、某个 harness、某个系统。
+- **可替换**：脑子、手脚、入口都能换。
+- **优雅降级**：一个插件坏了，管家别的还能干，并且老实告诉你哪块坏了。
+
+核心一句话：**JARVIS 该拥有的是体验，不是基础设施。** 现成的就拿来做手脚，别什么都自己造。
+
 ```
-你说一句话
+你说一句话（音箱 / 屏幕 / 手机打字）
    ↓
-JARVIS Agent（理解意图，决定调哪个工具）
+Harness（可替换的「脑子」：DSH、pi 或其他）
+   ├─ 身份：system prompt 告诉它「你是谁、这个家什么样、主人的习惯」
    ↓
-LLM（大模型，负责「听懂人话」；没 GPU 时用规则兜底）
-   ↓
-Tool（标准化的动作，如「开灯」）
-   ↓
-HomeAssistantClient（唯一对外出口，封装所有 HTTP）
+插件 = 管家的手脚（每个场景一个插件）
+   例：home 插件 → 列设备 / 读状态 / 调服务
    ↓
 Home Assistant（运行在 Docker 里的智能家居中枢）
    ↓
 虚拟设备（用 YAML 造出来的灯/空调/窗帘…，不用真硬件）
 ```
 
-**关键纪律（贯穿全项目）**：LLM 永远不能直接给 Home Assistant 发 HTTP 请求。它只能调标准工具，工具再交给 `HomeAssistantClient`。这样换真设备、换真 LLM 都不用重写上层。
+**关键纪律（贯穿全项目）**：模型只能调用插件暴露的标准工具，永远拿不到 Home Assistant 的地址和令牌。这样换 harness、换真设备、换模型，都不用重写另一层。
+
+**三个词的大白话**：
+
+- **harness**：包在大模型外面的那层程序。模型只会「想」，harness 负责把工具清单递给它、按它说的去调工具、把结果再喂回去，循环到任务完成。
+- **插件**：给模型添的一种能力。一个插件 = 几个工具 + 说明文字。想要新本事就加插件，不用动脑子。
+- **system prompt**：开场白。每次对话一开始就塞给模型的一段话，决定它是谁、怎么做事。
 
 ---
 
@@ -50,20 +65,26 @@ Home Assistant（运行在 Docker 里的智能家居中枢）
 
 > 这是你的硬要求，我每次都更新这段。
 
-**已经能做的（截至 2026-09-03，Phase 3 完成）**：
+**已经能做的（截至 2026-11-27）**：
 - ✅ 项目骨架已建好，能跨机器复现（环境变量 + 配置文件驱动，无硬编码）。
-- ✅ Home Assistant 容器已在 Docker 里跑起来（端口 8123，状态 healthy）。
+- ✅ Home Assistant 容器已在 Docker 里跑起来（端口 8123）。
 - ✅ 一个**虚拟家庭**已在 HA 里注册完成：4 灯、3 空调、2 窗帘、1 电视、1 门锁、1 扫地机、4 温度传感器、5 有人传感器，共 21 个"真 domain"实体。
-- ✅ **JARVIS 已连上 HA**（`.env` 里写入真实长期令牌，实测能拉到全部实体）。
 - ✅ **拓扑语义层**：能用「客厅 + 灯」查出 entity_id；查不到时返回结构化错误而不崩溃。
-- ✅ **HA 客户端**：能读任意实体状态，也能调服务**真正改变设备**——实测「开灯→关灯」状态确实翻转，温度读到 22.5 °C。
-- ✅ **73 个测试全绿**，且全部不需要 HA 容器（靠测试替身，8 秒跑完）。
+- ✅ **HA 客户端**（Python）：能读任意实体状态，也能调服务改变设备。
+- ✅ **73 个测试全绿**（Phase 3 完成时的记录），全部不需要 HA 容器。
+- ✅ **能用自然语言控制设备了**：给 DSH 写了一个 home 插件（约 190 行），你说「打开所有灯」四盏灯全开；说「我好热」它会先给你选项；设空调后会查一遍实际状态再回复。
+- ✅ 这个插件在 DSH 的**桌面应用**和**无界面命令行**里都能用。
 
 **还做不到的（卡点 / 未做）**：
-- ❌ 还不能「对话控制」设备——控制设备的能力已经具备，但**还缺"听懂人话"的入口**，那是 **Phase 7 的规则路由**。
-- ❌ 还没有真实 LLM 接入（现在用 Stub 假模型，只验证链路，不真听懂人话）。
-- ❌ 还没有 Web 界面、场景、记忆库等（这些是 Phase 5 以后的事）。
-- ⚠️ 已知偏差：Phase 3 只做了 REST，**未做 WebSocket**（Phase 4–7 用轮询即可满足），已在 `PHASES.md` 如实标注。
+- ❌ **还没有身份**：现在只是「一个能控设备的助手」，不是「管家」。人设、这个家什么样、你的习惯，还没写进 system prompt。
+- ❌ **没有权限控制**：插件什么服务都放行，说「解锁前门」它就会直接开，不会先问你。高风险动作必须由代码拦着，不能只靠 prompt。
+- ❌ **只会控设备这一件事**：搜索、往屏幕上投东西，这些插件还没做。
+- ❌ **不能常驻**：命令行模式一个进程只跑一个任务，没有一直在后台的管家服务。
+- ❌ **没有语音**：只能打字。音箱走哪条路还没定。
+- ❌ **没有记忆**，也不会主动做事。
+- ⚠️ **没定用哪个 harness**：DSH 先试通了，pi 等备选还没评估。
+- ⚠️ 已知问题：虚拟客厅灯关着时，带亮度说「调到 50%」灯不会亮，只会改亮度。
+- ⚠️ 已知偏差：Phase 3 的 HA 客户端只做了 REST，未做 WebSocket。
 
 ---
 
@@ -82,7 +103,12 @@ Home Assistant（运行在 Docker 里的智能家居中枢）
 | **WebSocket** | 一种长连接通信，用于 HA 的某些命令（如取长期令牌）。 |
 | **LLM / tool calling** | 大模型"听懂人话并决定调用哪个工具"。 |
 | **Stub** | 一个"假的"替身，行为确定、可控，用来在不依赖真模型的情况下把整条链路测通。 |
-| **Ollama** | 在你本机跑大模型的服务。带 GPU 的机器才用。 |
+| **harness** | 包在大模型外面的程序：递工具清单、按模型说的调工具、把结果喂回去，循环到任务完成。 |
+| **插件** | 给模型添的一种能力，一个插件 = 几个工具 + 说明文字。管家的「手脚」。 |
+| **system prompt** | 每次对话开头塞给模型的开场白，决定它是谁、怎么做事。管家的「身份」。 |
+| **权限（Permissions）** | 由代码执行的规则：哪些动作可以直接做，哪些必须先问主人。写在 prompt 里的不算数，模型可能不听。 |
+| **DSH** | DeepSeek Harness，DeepSeek 开源的 harness，是我们第一个试的「脑子」。 |
+| **Ollama** | 在你本机跑大模型的服务。现在的路线先用 API 模型，暂时用不上。 |
 | **FastAPI** | 我们 JARVIS 应用用的 Web 框架。 |
 | **Pydantic** | 帮我们"校验配置对不对"的 Python 库。 |
 | **uv** | 现代的 Python 依赖/环境管理工具（比 pip 快）。 |
@@ -109,14 +135,14 @@ Home Assistant（运行在 Docker 里的智能家居中枢）
 - [`01-phase1-repo-skeleton.md`](learn/01-phase1-repo-skeleton.md) — 仓库骨架、配置系统、健康检查、Stub LLM、HA 客户端骨架、22 测试（已提交 commit `1267388`）
 - [`02-phase2-virtual-home.md`](learn/02-phase2-virtual-home.md) — 用纯 YAML 造出 21 个虚拟设备，HA 容器跑起来（已提交 commit `5a0d740`）
 - [`03-phase3-topology-client.md`](learn/03-phase3-topology-client.md) — **拓扑语义层 + 真正的 HA 客户端**：一次讲透 6 个概念（映射层 / Protocol / 结构化结果 / 幂等重试 / 测试替身 / 防腐层），结尾有完整旅程串讲
+- [`04-harness-spike.md`](learn/04-harness-spike.md) — **第一次用自然语言控设备**：harness 路线、home 插件、实测结果、踩的坑
 
 ### 计划中（进度推进时新增）
-- `04-phase4-tools.md` — 工具层（开灯/调温等标准化动作）
-- `05-phase5-scenes.md` — 场景（"电影模式"一键联动）
-- `06-phase6-memory.md` — 记忆库（SQLite）
-- `07-phase7-web-and-rules.md` — Web 界面 + 规则路由（此时能对话控制）
-- `08-phase8-llm.md` — 接入真实 LLM
-- `09-phase9-polish.md` — 测试、可观测性、文档打磨
+
+原来的 `04`–`09` 六篇（自研工具层、场景、记忆、Web 界面、接 Ollama、打磨）随着改成 harness 路线而搁置。新的笔记按 `docs/PHASES.md` 的阶段来：
+
+- `05-identity.md` — 给管家身份（system prompt）
+- `06-web-plugin.md` — 第二个插件：搜索 / 读网页
 
 > 完整阶段计划见 `docs/PHASES.md`。
 
@@ -149,6 +175,7 @@ Home Assistant（运行在 Docker 里的智能家居中枢）
 
 | 位置 | 文档说 | 代码实际 | 状态 |
 |---|---|---|---|
-| `ARCHITECTURE.md` D7 | HA 用 named volume | 已改为 **bind mount** `./homeassistant/config:/config` | 需在 ARCHITECTURE 里改正 |
-| `ARCHITECTURE.md` §10 环境变量表 | `HA_URL` / `HA_TOKEN` / `LLM_PROVIDER`… | 实际带 `JARVIS_` 前缀：`JARVIS_HA_URL` / `JARVIS_HA_TOKEN` / `JARVIS_LLM_PROVIDER`… | 需在 ARCHITECTURE 里改正 |
-| `ARCHITECTURE.md` §5 | cover/lock/vacuum 用 template + script | 实际用 `generic_thermostat`(空调) + `template switch`(电视)，未用 script | 描述可简化 |
+| `ARCHITECTURE.md` D7 | HA 用 named volume | 实际是 **bind mount** `./homeassistant/config:/config` | 已改正（2026-11-27） |
+| `ARCHITECTURE.md` 环境变量表 | `HA_URL` / `HA_TOKEN` / `LLM_PROVIDER`… | 实际带 `JARVIS_` 前缀 | 已改正（2026-11-27） |
+| `ARCHITECTURE.md` 虚拟家庭 | cover/lock/vacuum 用 template + script | 实际用 `generic_thermostat`（空调）+ `template switch`（电视），未用 script | 已改正（2026-11-27） |
+| home 插件 | `ARCHITECTURE.md` 说模型拿不到 HA 地址 | 属实：模型只看到 3 个工具，令牌由插件从 `.env` 读 | 一致 |

@@ -1,55 +1,107 @@
 # JARVIS
 
-本地优先（local-first）的个人 AI 家庭助手原型。
+一个长期演进的个人 AI Agent。长期目标是成为一个能够理解主人、持续运行，并通过不同工具与数字世界和物理环境交互的个人智能体。
 
-长期愿景是《钢铁侠》里那种 JARVIS：语音交互、全屋传感器、灯光空调窗帘家电、本地大模型、长期记忆、自动化。但**现在还没有真实硬件**，所以当前项目是一个**纯软件的、可迁移到真实智能家居的原型**。
+对标《钢铁侠》里的 JARVIS：它不属于某个设备、某个模型或某个应用。**智能家居是第一个应用场景，而不是项目边界。**
 
-语音这部分不自己写：**成品音箱当「嘴和耳朵」，JARVIS 当「脑」**。音箱负责听和说，把听到的话转成文字交给 JARVIS；JARVIS 负责听懂、决定、控制设备，再回一句话让音箱播出来。所以 JARVIS 对外的核心契约只有一条：**文字进，一句回复出**。接音箱是最后一个阶段（Phase 10），前面的阶段不需要任何硬件。
-
-核心要证明的事情只有一件：
-
-```
-自然语言 → 本地 LLM → Agent → Tool Calling → Home Assistant → 虚拟家庭
-```
-
-这条链路能稳定跑通，并且未来把「虚拟设备」换成「真实设备」时，Agent 和 Tool 不需要重写。
+当前仍处于原型阶段：先以文字入口和 Home Assistant 虚拟设备验证最小闭环，再逐步扩展 Web、屏幕、电脑等能力。现在还没有接入真实家庭硬件。
 
 ---
 
-## 当前状态
+## 项目方向
 
-**Phase 1–3 已完成** —— 仓库骨架与配置系统、可复现虚拟家庭（21 个虚拟设备）、拓扑语义层与 Home Assistant 客户端（73 个测试全绿，已对真实 HA 验证）。
+**长期目标：Personal AI Agent。当前落地：Smart Home first。**
 
-| 阶段 | 内容 | 状态 |
-|---|---|---|
-| 1 | 仓库骨架与配置基础设施 | ✅ 已完成 |
-| 2 | Home Assistant 与可复现虚拟家庭 | ✅ 已完成 |
-| 3 | 拓扑配置与 HomeAssistantClient | ✅ 已完成 |
-| 4 | 工具层 | 未开始 |
-| 5 | 场景 | 未开始 |
-| 6 | 记忆（SQLite） | 未开始 |
-| 7 | API 与 Web UI + 规则路由 | 未开始 |
-| 8 | LLM Provider 与 Agent | 未开始 |
-| 9 | 测试、可观测性打磨、文档 | 未开始 |
-| 10 | 接成品音箱（Siri 快捷指令 / 小爱） | 未开始 |
+JARVIS 的价值不在于控制某一类设备，而在于能够理解用户的任务，并通过可替换的能力模块完成任务。
 
-详细的阶段计划与验收标准见 [`docs/PHASES.md`](docs/PHASES.md)，每一步的实测数字记在其中的「验证记录」小节。
-架构设计与决策理由见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
-**给非工程背景的学习笔记（讲人话、每次做完工作一篇）见 [`docs/LEARN.md`](docs/LEARN.md)。**
+长期可能涉及的能力包括：
+
+- 智能家居与物理设备
+- Web 搜索与信息整理
+- 电脑和应用操作
+- 文件与日程管理
+- 长期个人上下文与记忆
+- 多步骤任务协调
+
+这些是长期能力方向，不代表当前阶段都要实现。
 
 ---
 
-## 明确不做（当前阶段）
+## 架构原则
 
-以下都属于未来阶段，**当前不实现**：
+1. **解耦（Decoupling）**：模块职责清晰，通过稳定接口协作；更换一个模块不应导致其他模块大规模修改。
+2. **可迁移（Portability）**：不绑定某个模型供应商、Harness、操作系统、硬件或设备生态。
+3. **可替换（Replaceability）**：模型、Harness、插件、交互入口和外部系统都允许升级或替换。
+4. **故障隔离与优雅降级（Graceful Degradation）**：单个插件或外部服务不可用，不应拖垮整个 JARVIS；能力可以独立失效和恢复。
 
-- 任何物理硬件：Zigbee、Matter、真实灯具/传感器/扫地机
-- 麦克风阵列、唤醒词、Whisper、TTS
-- 摄像头与真实存在检测
-- RAG、向量数据库、Milvus
-- Kubernetes、分布式系统、微服务拆分
+核心原则：**JARVIS 应该拥有体验，而不是拥有基础设施。**
 
-当前唯一目标是**用虚拟设备证明架构可行**。
+优先使用成熟生态提供的模型、Agent Runtime、语音和设备接入能力；自己掌握稳定的核心契约、身份与上下文、权限规则，以及让不同组件协同工作的整体体验。只有现有方案无法满足真实需求时，才考虑自研基础设施。
+
+---
+
+## 当前架构概念
+
+```text
+交互层
+  文字 / 语音 / 手机 / 桌面 / 屏幕
+        │
+        ▼
+Agent Runtime
+  Harness / 模型 / 工具调度 / 会话管理
+        │
+        ▼
+JARVIS Core Contracts
+  Identity & Context / Permissions
+  （Memory、Task State 后续按需引入）
+        │
+        ▼
+能力层（插件）
+  Home / Web / Screen / Computer / Files / ...
+        │
+        ▼
+外部系统
+  Home Assistant / 操作系统 / 互联网 / 设备 / 应用
+```
+
+这是长期参考架构，不是当前开发清单。当前只实现最小闭环，不提前建设完整的记忆系统、任务编排框架或通用 Agent 平台。
+
+一句话概括当前实现思路：**Harness 提供 Agent 运行环境，插件提供能力，JARVIS 定义身份、上下文与权限边界。**
+
+---
+
+## 当前进展（2026-11-27）
+
+- **Python 基础仓库**：配置系统、Home Assistant 客户端、拓扑映射、21 个虚拟设备，已对真实 HA 验证；阶段 0 记录为 73 个测试通过。
+- **Harness spike 已通过**：使用 DeepSeek Harness（DSH）验证了 home 插件；模型能够列出设备、控制灯并读回状态，在 DSH 桌面应用中跑通。
+- **尚未实现**：身份（Identity）、权限控制（Permissions）。现在的 spike 插件对模型开放了所有 HA 服务，没有任何确认机制。
+- **尚未决定**：最终 Harness（DSH、pi 或其他）、插件正式放置位置、Python HA client 如何接入、常驻服务形态、语音入口路线。
+
+详细结果见 [`docs/PHASES.md`](docs/PHASES.md)，架构决策见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+---
+
+## 当前阶段明确不做
+
+- 不自己写 Agent Runtime / Harness；优先采用成熟方案。
+- 不自己写语音链路（麦克风、唤醒词、语音识别、合成）；优先复用现有语音生态。
+- 不做购买和支付。
+- 不做主动式行为；先把用户发起任务的闭环做好。
+- 不接真实物理硬件；先用 Home Assistant 虚拟设备验证。
+- 不提前建设完整 Memory、通用任务编排或个人操作系统。
+
+---
+
+## 文档
+
+| 文档 | 内容 |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 长期定位、架构原则、设计决策与技术记录 |
+| [`docs/PHASES.md`](docs/PHASES.md) | 阶段计划、验收标准、实测记录 |
+| [`docs/CHECKLIST.md`](docs/CHECKLIST.md) | 执行清单 |
+| [`docs/LEARN.md`](docs/LEARN.md) | 学习笔记 |
+| [`docs/VIRTUAL_HOME.md`](docs/VIRTUAL_HOME.md) | 虚拟家庭设备清单 |
+| [`docs/research/`](docs/research/) | 调研笔记 |
 
 ---
 
@@ -58,13 +110,13 @@
 | 组件 | 版本 | 必需 | 说明 |
 |---|---|---|---|
 | Python | ≥ 3.11 | 是 | 推荐用 [uv](https://docs.astral.sh/uv/) 管理 |
-| Docker + Compose | 近期版本 | 是 | **仅用于跑 Home Assistant**（HA 不支持 Windows 原生安装） |
-| Ollama | 近期版本 | 否 | 有 NVIDIA GPU 的机器上才需要；无 GPU 可用 `stub` provider 开发 |
+| Docker + Compose | 近期版本 | 是 | 当前用于运行 Home Assistant |
 | Git | 任意 | 是 | |
+| 一个 Harness（如 DSH） | — | 运行插件时需要 | 可使用 API 模型，不要求 GPU |
 
-跨平台目标：Windows / Linux / macOS 都能跑。Windows 上的已知差异记录在 `docs/ARCHITECTURE.md` 的「可移植性」一节。
+跨平台目标：Windows / Linux / macOS。机器相关配置通过环境变量或本地配置文件提供，不提交密钥和私人数据。
 
-> **Docker Desktop 授权提醒**：Docker Desktop 对大型企业的商业使用需要付费订阅。若在开发机上有合规顾虑，可在 WSL2 中直接安装免费的 Docker Engine 作为替代。请自行确认所在组织的政策。
+> **Docker Desktop 授权提醒**：Docker Desktop 对大型企业的商业使用需要付费订阅。若有合规顾虑，可评估 WSL2 中的 Docker Engine，并遵循所在组织政策。
 
 ---
 
@@ -78,30 +130,16 @@
 
 脚本会检查 uv → 安装依赖 → 从 `.env.example` 生成 `.env` → 建好 `data/` 与 `homeassistant/config/`。
 
-没有 uv 的话先装一个：
-
-```bash
-# Windows
-winget install astral-sh.uv
-# macOS
-brew install uv
-# Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
 ### 2. 启动 Home Assistant
 
 ```bash
 docker compose up -d
-docker compose ps            # 等状态变成 healthy
+docker compose ps            # 等状态变成 healthy（首次约 1–3 分钟）
 ```
 
-首次启动需要 1–3 分钟。之后打开 <http://localhost:8123> 完成首次引导，
-创建长期访问令牌（左下角用户名 → 安全 → 创建令牌），填进 `.env` 的 `JARVIS_HA_TOKEN`。
+首次启动后打开 <http://localhost:8123> 完成 HA 引导（左下角用户名 → 安全 → 创建令牌），并将长期访问令牌写入本地 `.env` 的 `JARVIS_HA_TOKEN`。
 
-> HA 配置通过 **bind mount** 直接挂在宿主机 `homeassistant/config/`（非 named volume），改 YAML 即时生效，无需导出脚本。
-
-### 3. 启动 JARVIS
+### 3. 启动 Python 服务
 
 ```bash
 uv run uvicorn jarvis.main:app --reload
@@ -111,81 +149,53 @@ uv run uvicorn jarvis.main:app --reload
 
 ```bash
 curl http://localhost:8000/api/health
+uv run pytest
+uv run ruff check .
 ```
 
-还没配 HA 令牌时会返回：
-
-```json
-{
-  "status": "degraded",
-  "env": "dev",
-  "version": "0.1.0",
-  "services": {
-    "jarvis":         { "status": "online",       "detail": "running", "latency_ms": null },
-    "home_assistant": { "status": "disconnected", "detail": "未配置 JARVIS_HA_TOKEN", "latency_ms": 3.1 },
-    "llm":            { "status": "disconnected", "detail": "stub provider：未连接任何模型", "latency_ms": null }
-  }
-}
-```
-
-**注意 HA 不可用时接口依然返回 200**，只是整体状态标成 `degraded`。这是刻意的降级行为：
-任何外部服务故障都不能让 JARVIS 崩掉。
+HA 不可用时，服务应保持可用并报告 `degraded`，而不是整体崩溃。
 
 ### 常用命令
 
 ```bash
-uv run pytest                          # 跑测试（不需要 HA 或 Ollama）
-uv run ruff check .                    # 静态检查
 docker compose logs -f homeassistant   # 看 HA 日志
-docker compose down                    # 停 HA（YAML 配置保留在宿主机 homeassistant/config/，不受影响）
+docker compose down                    # 停 HA（配置保留在宿主机 homeassistant/config/，不受影响）
 ```
 
 ---
 
-## 仓库结构（概览）
+## 仓库结构
 
-```
-config/           home_topology.yaml（Phase 3 起：设备映射唯一真相）、scenes.yaml（Phase 5 起）
-homeassistant/    HA 配置与 virtual_home.yaml（可复现的虚拟家庭）
-src/jarvis/       llm / ha / home / tools / agent / memory / api / web
+```text
+homeassistant/    HA 配置与 virtual_home.yaml
+config/           home_topology.yaml
+src/jarvis/       Python 服务
 tests/            单元测试与集成测试
-scripts/          初始化、HA 配置导出导入等辅助脚本
-docs/             ARCHITECTURE.md、PHASES.md、LEARN.md（学习笔记，见 learn/ 子目录）
+evals/            评测集
+scripts/          初始化、校验与辅助脚本
+docs/             架构、阶段计划与学习笔记
 ```
 
----
-
-## 配置
-
-所有机器相关的配置走环境变量。复制 `.env.example` 为 `.env` 后按需填写：
-
-```bash
-cp .env.example .env
-```
-
-**`.env` 永不提交。** 令牌、密钥、数据库、日志、模型文件全部在 `.gitignore` 中。
+home 插件 spike 当前位于仓库外：`D:\dsh-plugins\dsh-plugin-home`；正式放置位置待定。
 
 ---
 
 ## 多机器工作流
 
-本仓库设计为在多台机器间流转（例如一台无 GPU 的开发机 + 一台带 NVIDIA GPU 的家用机）：
-
-- **代码与虚拟家庭定义**：通过 Git 同步，fresh clone 即可重建相同环境
-- **环境变量**：每台机器各自维护自己的 `.env`（不提交）
-- **数据库与对话历史**：**不同步**，每台机器独立
-- **模型**：不提交，通过 `scripts/pull_model.sh` 按需拉取
-- **依赖**：由 `uv.lock` 锁定，保证两台机器依赖版本一致
-
-详细的换机初始化步骤见 `docs/ARCHITECTURE.md`。
+- 代码与虚拟家庭定义通过 Git 同步。
+- 每台机器独立维护 `.env`。
+- 数据库与对话历史默认不跨机器同步。
+- Python 依赖由 `uv.lock` 锁定。
+- 不将机器专属路径、IP、密钥或令牌硬编码进源码。
 
 ---
 
 ## 安全
 
-- 源码中不含任何密钥、令牌、密码
-- 高危操作（如开前门锁）在架构层面带确认机制，MVP 阶段可通过配置关闭
-- 不提交 `.env`、数据库、日志、Docker volume
+- 源码不包含密钥、令牌和密码；`.env` 不提交。
+- 模型只能调用插件暴露的结构化工具，不能直接获取 HA 地址和令牌。
+- 高风险动作必须由代码层权限策略控制并要求确认，不能只依赖 system prompt。**这一条目前还没实现**，排在 `docs/PHASES.md` 阶段 3。
+- 不提交数据库、日志、缓存、Docker volume 和私人对话数据。
 
 ---
 

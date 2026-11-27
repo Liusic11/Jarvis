@@ -1,208 +1,222 @@
 # JARVIS 架构设计
 
-本文档记录 JARVIS 的架构决策与理由。实现前先读这份文档。
+本文档记录 JARVIS 的长期定位、架构原则、设计决策与实现约束。实现前先读这份文档。
 
 ---
 
-## 1. 目标与非目标
+## 1. 定位与范围
 
-### 目标
+### 1.1 长期定位
 
-1. 证明「自然语言 → 本地 LLM → 工具调用 → Home Assistant → 虚拟设备」这条链路可靠
-2. 虚拟设备可无感知替换为真实设备（Agent / Tool 层不重写）
-3. 完全本地运行，不依赖云端 LLM
-4. 单一仓库可跨机器、跨平台复现
-5. 每一步都可观测、可调试
+JARVIS 是一个长期演进的个人 AI Agent：能够理解主人提出的任务，通过不同交互入口与主人沟通，并通过可替换的能力模块与数字世界和物理环境交互。
 
-### 非目标
+长期目标更接近《钢铁侠》中的 JARVIS，而不是一个只负责智能家居的语音助手。它不应绑定某个设备、模型、Harness 或应用生态。
 
-- 不做语音（麦克风 / 唤醒词 / Whisper / TTS）
-- 不做真实硬件接入（Zigbee / Matter / 摄像头 / 真扫地机）
-- 不做 RAG / 向量数据库
-- 不做分布式、微服务、Kubernetes
-- 不追求 UI 视觉效果
+**智能家居是第一个应用场景，不是项目边界。**
+
+长期可能扩展到 Web、电脑操作、文件、日程和多步骤任务协调。但这些是方向，不是当前阶段的建设清单。
+
+### 1.2 当前范围
+
+当前优先做任务型闭环：用户提出任务，JARVIS 理解任务、调用能力、核验结果并回复。
+
+当前先用文字入口和 Home Assistant 虚拟设备验证架构。主动式行为、长期记忆、复杂任务编排和真实硬件接入暂缓。
+
+**现在还没有真实家庭硬件。** 设备全部是 Home Assistant 中的虚拟设备，用来验证能力接口和操作闭环。
 
 ---
 
-## 2. 系统分层
+## 2. 架构原则
 
+### P1. 解耦（Decoupling）
+
+模块有清晰职责，通过明确接口协作，不依赖其他模块的内部实现。替换一个模块时，尽量只修改该模块及其适配层。
+
+### P2. 可迁移（Portability）
+
+不把 JARVIS 绑定在单一模型供应商、Harness、操作系统、硬件或设备生态上。配置、数据和能力接口应尽量与运行环境分离。
+
+### P3. 可替换（Replaceability）
+
+模型、Harness、插件、语音入口、外部服务都允许升级、替换或移除。技术选型应考虑未来迁移成本，而不只考虑今天接入是否方便。
+
+### P4. 故障隔离与优雅降级（Graceful Degradation）
+
+单个插件或外部服务不可用，不应拖垮整个 JARVIS。能力应尽量独立部署、独立测试、独立恢复；不可用时应明确报告降级状态，而不是假装成功。
+
+### P5. 不重复建设基础设施
+
+优先采用成熟的 Agent Runtime、模型服务、语音生态和设备网关。只有现有生态无法满足明确需求时，才自研对应组件。
+
+**核心原则：JARVIS 应该拥有体验，而不是拥有基础设施。**
+
+JARVIS 应掌握的是稳定的核心契约、身份与上下文、权限规则，以及不同组件协同工作的整体体验；不需要为了「拥有」而自己实现模型、Harness、语音引擎或设备网关。
+
+### 2.1 技术替换检验
+
+引入一个新组件或技术方案时，至少问：
+
+1. 如果未来换成另一个模型 / Harness / 服务，哪些代码需要修改？
+2. 是否能通过适配层或配置完成替换？
+3. 组件不可用时，其他能力是否仍能工作？
+4. 是否把某个供应商的专有数据结构泄漏到了核心逻辑？
+5. 是否有测试或评测能证明替换前后行为没有退化？
+
+如果替换一个组件需要大规模重写其他模块，应重新审视耦合边界。
+
+---
+
+## 3. 长期参考架构
+
+这是目标架构的逻辑分层，不代表当前需要一次性实现全部模块。
+
+```text
+┌─────────────────────────────────────────────┐
+│ 交互层（Interaction Layer）                  │
+│ 文字 / 语音 / 手机 / 桌面 / 屏幕              │
+└──────────────────────┬──────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────┐
+│ Agent Runtime                               │
+│ Harness / 模型 / 工具调度 / Session          │
+└──────────────────────┬──────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────┐
+│ JARVIS Core Contracts                       │
+│ Identity & Context / Permissions            │
+│ Memory / Task State（后续按需引入）          │
+└──────────────────────┬──────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────┐
+│ 能力层（Capability Layer）                   │
+│ Home / Web / Screen / Computer / Files / ... │
+└──────────────────────┬──────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────┐
+│ 外部系统（External Systems）                 │
+│ Home Assistant / OS / Internet / Devices     │
+│ Applications / Third-party Services          │
+└─────────────────────────────────────────────┘
 ```
-┌────────────────────────────────────────────┐
-│  Web UI（静态资源，由 FastAPI 提供）         │
-│  聊天 · 家庭状态 · 事件日志 · 系统状态        │
-└───────────────────┬────────────────────────┘
-                    │ HTTP / SSE
-┌───────────────────▼────────────────────────┐
-│  Agent                                     │
-│  ├─ IntentRouter                           │
-│  │   ├─ RuleStrategy   确定性规则，优先     │
-│  │   └─ LLMStrategy    LLM 兜底            │
-│  └─ Runner            执行循环 + trace      │
-└──────┬──────────────────────────┬──────────┘
-       │                          │
-┌──────▼───────────┐   ┌──────────▼──────────┐
-│  Tools           │   │  LLMProvider (ABC)  │
-│  · JSON Schema   │   │  ├─ StubProvider    │
-│  · 参数校验       │   │  └─ OllamaProvider  │
-│  · 风险分级       │   └──────────┬──────────┘
-│  · 结构化返回     │              │ OLLAMA_URL
-└──────┬───────────┘              ▼
-       │                    Ollama（本机服务）
-┌──────▼───────────────────┐
-│  HomeAssistantClient     │
-│  ▸ 唯一的 HA 出口          │
-│  ▸ 超时 / 重试 / 错误映射  │
-└──────┬───────────────────┘
-       │ REST / WebSocket
-┌──────▼───────────────────┐
-│  Home Assistant          │
-│  虚拟家庭（纯 YAML 定义）  │
-└──────────────────────────┘
 
-旁路：SQLite（trace / 会话 / 事件）· home_topology.yaml（设备映射）
-```
+### 3.1 各层职责
 
-### 不可违反的约束
+| 层 | 职责 | 设计要求 |
+|---|---|---|
+| 交互层 | 接收用户输入、呈现结果 | 入口可替换，不承载核心业务规则 |
+| Agent Runtime | 对话循环、模型调用、工具调度、会话运行 | 优先使用成熟 Harness；避免把业务逻辑写死在某个 Runtime |
+| JARVIS Core Contracts | 定义身份、上下文、权限等稳定概念 | 由项目掌握接口；保持轻量，不提前做成大框架 |
+| 能力层 | 提供 Home、Web、Screen 等具体能力 | 插件独立、结构化输入输出、可单独测试 |
+| 外部系统 | 实际执行动作或提供数据 | 通过适配器接入，不让供应商细节渗入核心 |
 
-**LLM 永远不能直接向 Home Assistant 发任意 HTTP 请求。**
-所有 HA 通信必须经由 `HomeAssistantClient`。Agent 只认识结构化工具（`turn_on_light(room="living_room")`），不认识 URL。
+### 3.2 Core Contracts 的引入顺序
+
+- **当前优先**：Identity & Context、Permissions。
+- **后续按需**：Memory、Task State。
+- 不因为长期架构图中出现某个模块，就提前实现它。
+- Core Contracts 是稳定的接口和数据约定，不是另一个自研 Agent Framework。
 
 ---
 
-## 3. 核心设计决策
+## 4. 当前实现结构
+
+当前采用 Harness + 插件的路线：
+
+```text
+用户（当前以文字入口为主）
+        │
+        ▼
+Harness（候选：DSH / pi / 其他）
+  对话循环 · 模型调用 · 工具调度 · 会话管理
+        │  启动时注入
+        ├── JARVIS Identity / Context
+        ▼
+结构化工具接口
+        ├── home 插件   → Home Assistant → 虚拟设备（已跑通）
+        ├── web 插件    → 搜索 / 网页读取（待做）
+        └── screen 插件 → 电视 / 电脑屏幕（待做）
+```
+
+| 组件 | 当前职责 | 替换原则 |
+|---|---|---|
+| Harness | Agent 运行环境 | 插件通过薄适配层接入，不依赖 Harness 内部实现 |
+| 模型 | 理解任务、选择工具、组织回答 | 允许更换 API 或本地模型；更换后重新跑评测 |
+| 插件 | 提供具体能力并返回结构化结果 | 独立包、独立测试、可安装和移除 |
+| Identity / Context | 提供 JARVIS 身份和相关环境信息 | 与插件实现分离；逐步从静态文本演进为动态上下文 |
+| 外部系统 | 实际执行操作 | 通过适配器接入，避免核心代码绑定某个供应商 |
+
+### 不可违反的安全约束
+
+**模型只能调用插件暴露的结构化工具，不能直接获得外部系统的密钥或底层访问凭据。**
+
+- 模型认识的是 `home_call_service(domain, service, entity_id)`，不是 Home Assistant URL。
+- HA token 只存在于插件进程或插件后端，通过环境变量或本地 `.env` 读取。
+- 插件返回结构化结果，自然语言由 Harness / 模型组织。
+- 高风险动作必须在代码层实施权限检查和确认，不可只靠 prompt 约束。**这一条尚未实现**，见第 9.3 节。
+
+---
+
+## 5. 设计决策
+
+### 5.1 现行决策
 
 | # | 决策 | 理由 |
 |---|---|---|
-| D1 | 虚拟设备用 **YAML template 实体** | 纯配置、可提交、零 UI 操作、fresh clone 可复现。靠 UI 或 WebSocket API 建的实体存在 `.storage/` 里，不可复现 |
-| D2 | **`home_topology.yaml` 是设备映射的唯一真相** | Agent/Tools 只认逻辑语义（`living_room` + `light`），由此文件翻译成 entity_id。换真实设备只改这一个文件 |
-| D3 | 意图路由 **规则优先 + LLM 兜底** | 无 GPU 时只能用 CPU 小模型，其 tool calling 可靠性差（参数填错、幻觉房间名、该调工具却闲聊）。规则吃掉高频固定句式；顺带满足「LLM 不可用时系统仍可用」的降级要求 |
-| D4 | **LLM 抽象在 Phase 1 就位**，配 `StubProvider` | 否则 Phase 2–7 完全无法端到端测试 |
-| D5 | `HomeAssistantClient` 定义为 **Protocol + MockClient** | 测试不依赖 HA 容器，CI 也能跑 |
-| D6 | 实现顺序 **确定性优先，LLM 最后接** | 每个阶段结束时都有一个可运行、可测试的系统，而不是长期处于「做了一半没法验证」 |
-| D7 | HA 配置用 **named volume**，不用 Windows bind mount | WSL2 跨文件系统小文件 I/O 慢，HA 重度读写 SQLite，有性能与损坏风险。可复现性改由 export/import 脚本保证 |
-| D8 | 代码在**本机跑**，Docker 只装 HA | Windows 容器内 `uvicorn --reload` 的文件监听慢且易失效，断点调试困难 |
-| D9 | **无 GPU 开发机不装 Ollama**，用 `StubProvider` | 开发专注确定性逻辑；真模型在带 GPU 的机器上验证。同时避免在资源受限的机器上跑大模型 |
-| D10 | 数据库**不跨机器同步** | 最简单、无冲突，也避免私人对话进入 Git |
-| D11 | `.gitattributes` 强制 `*.sh` 用 LF | Windows 下 CRLF 会让脚本进容器后直接失败 |
-| D12 | 每个 Tool 带 `risk_level` | 高危操作（开门锁）走确认接口；MVP 用配置关闭，但接口保留 |
+| H1 | **Harness 可替换**，不绑定 DSH | Agent Runtime 是可替换基础设施；DSH 仍处于 preview 阶段，接口可能变化 |
+| H2 | **能力以插件形式存在** | 加能力尽量不改 Runtime 和已有插件；插件可单独测试、移除 |
+| H3 | **身份与能力分离** | 人设、个人上下文不写进插件；当前可通过启动时注入 prompt，后续可接 Context Provider |
+| H4 | **Home Assistant 是当前智能家居场景的设备出口** | 统一米家、Matter、红外等设备生态；未来替换真实设备时尽量不改 home 能力 |
+| H5 | **模型可替换**，当前先用 API | API 便于快速验证；未来可评估本地模型。换模型后必须重新跑能力评测 |
+| H6 | **虚拟设备用 YAML 定义** | 配置可提交、可复现，fresh clone 可重建 |
+| H7 | **`home_topology.yaml` 记录设备映射** | 记录「房间 + 设备 → entity_id」；当前插件是否使用它待定 |
+| H8 | **`HomeAssistantClient` 使用 Protocol + MockClient** | 测试不依赖 HA 容器 |
+| H9 | **Python 代码在本机运行，Docker 当前只装 HA** | Windows 容器内 `uvicorn --reload` 文件监听慢且易失效 |
+| H10 | **数据库不跨机器同步** | 减少冲突，也避免私人对话进入 Git |
+| H11 | **`.gitattributes` 强制 `*.sh` 使用 LF** | 避免 Windows CRLF 导致脚本在容器中失败 |
 
----
+### 5.2 插件与 Harness 的适配原则
 
-## 4. 模块设计
+DSH、pi 等 Harness 的插件接口可能不同。项目定义自己的最小公共契约，Harness 专属代码限制在薄适配层。
 
-### 4.1 `llm/` — 大模型抽象
+目标不是保证插件源码在所有 Harness 中完全零修改，而是保证：
 
-```
-LLMProvider (Protocol)
-├── StubProvider      确定性返回预置 tool_call，用于开发与测试
-└── OllamaProvider    调用 Ollama /api/chat
-```
+- 插件核心逻辑不依赖 Harness 内部模块。
+- 工具定义、参数 Schema、结构化返回值有稳定约定。
+- 迁移 Harness 时主要修改适配层和部署配置。
+- 每个插件可脱离 Harness 单独测试。
 
-- Agent 只依赖 `LLMProvider` 协议，不知道底层是 Ollama 还是别的东西
-- 接口形态：`chat(messages, tools) -> AssistantMessage(content | tool_calls)`
-- `OllamaProvider` 需要处理两件事：
-  1. 模型是否支持原生 tool calling（支持的走原生，不支持的降级为「提示词约束 + 结构化输出 + Pydantic 校验 + 有限重试」）
-  2. 若使用带 thinking 的模型，必须关闭思考模式，否则会污染结构化输出
+### 5.3 已搁置的旧决策
 
-### 4.2 `ha/` — Home Assistant 客户端
+原计划自研工具层、规则路由、Agent 循环、Web UI 和记忆库。切换到 Harness 路线后，这些不再作为当前自研目标。旧方案全文见 Git 历史（commit `8030957`）。
 
-- `HomeAssistantClient` 是**唯一**的 HA 出口，封装 REST 与 WebSocket
-- 职责：`get_state` / `call_service` / `health_check` / 超时 / 重试 / 错误映射为领域异常
-- 所有请求带 `request_id` 便于追踪
-- **禁止**在 Tool 或 Agent 中出现裸 HTTP 调用
-
-### 4.3 `home/` — 拓扑与实体映射
-
-`config/home_topology.yaml` 结构示意：
-
-```yaml
-rooms:
-  living_room:
-    display_name: 客厅
-    devices:
-      light:
-        entity_id: light.living_room
-        capabilities: [on_off, brightness]
-      ac:
-        entity_id: climate.living_room
-        capabilities: [on_off, target_temperature]
-      curtain: { entity_id: cover.living_room }
-      tv:      { entity_id: media_player.living_room_tv }
-      presence:    { entity_id: binary_sensor.living_room_presence }
-      temperature: { entity_id: sensor.living_room_temperature }
-  # bedroom / study / kitchen / entrance ...
-home:
-  vacuum: { entity_id: vacuum.robot_vacuum }
-```
-
-- `topology.py` 负责加载、校验、提供 `resolve(room, device)` 与「房间有哪些设备」查询
-- **这是未来替换真实设备的唯一改动点**
-
-### 4.4 `tools/` — 工具层
-
-每个工具是一个显式注册的对象，包含：
-
-- `name`、`description`
-- `parameters`：JSON Schema（供 LLM 使用）
-- `risk_level`：`SAFE` | `CONFIRM_REQUIRED`
-- `execute(**kwargs) -> ToolResult`
-
-`ToolResult` 统一为结构化结果：
-
-```python
-{ "ok": bool, "data": {...}, "error": None | {"code", "message"}, "meta": {...} }
-```
-
-约束：
-
-- 必须校验房间与设备是否存在（非法输入返回结构化错误，不抛裸异常）
-- 必须处理 HA 调用失败（超时、连接失败、服务不存在）
-- **不得包含任何原始 HTTP 逻辑**，只调用 `HomeAssistantClient`
-- 返回结构化结果，不返回自然语言句子（自然语言由 Agent 组织）
-
-计划实现的工具：`get_home_state` / `get_room_state` / `turn_on_light` / `turn_off_light` / `set_light_brightness` / `set_ac` / `turn_off_ac` / `open_curtain` / `close_curtain` / `turn_on_tv` / `turn_off_tv` / `lock_front_door` / `unlock_front_door` / `get_temperature` / `get_presence` / `vacuum_start` / `vacuum_stop` / `vacuum_return_to_dock` / `activate_scene`
-
-### 4.5 `agent/` — 意图路由与执行
-
-```
-IntentRouter
-├── RuleStrategy    正则 / 关键词匹配高频固定句式，命中率高且零延迟
-└── LLMStrategy     未命中时交给 LLM 做工具选择
-```
-
-- `Runner` 负责执行循环：路由 → 参数校验 → 权限检查 → 执行 → 结果 → 组织回复 → 写 trace
-- **不暴露模型的思维链**，只暴露结构化信息（intent / tool / arguments / result）
-- 支持多轮工具调用（先查状态再决策），但 MVP 限制最大轮数防止死循环
-
-### 4.6 `memory/` — 记忆
-
-SQLite（`data/jarvis.db`，WAL 模式，单写者）。表：
-
-| 表 | 内容 |
+| 旧决策 | 现状 |
 |---|---|
-| `conversations` | 会话 |
-| `messages` | 消息 |
-| `tool_calls` | 工具调用记录（含参数与结果） |
-| `events` | 事件日志（系统级与用户级） |
-| `scene_executions` | 场景执行记录 |
-| `traces` | 单次请求的完整链路 |
-
-**不做** RAG、向量检索、Milvus。MVP 的记忆只用于「记住最近的交互与事件」。
-
-### 4.7 `api/` 与 `web/`
-
-- `api/`：FastAPI 路由 —— 聊天、家庭状态、事件日志、健康检查
-- `web/`：静态单页（HTML + 原生 JS），由 FastAPI 提供，**无构建步骤**
-  - 考虑过 Vite + React，但 MVP 目标是验证架构而非 UI，无构建步骤更简单、换机零成本
-  - 若后续 UI 变复杂再迁移不迟
-
-UI 四个区块：聊天 / 当前家庭状态 / 事件日志 / 系统状态（JARVIS、Ollama、HA 的连接状态）。
+| D3 规则优先 + LLM 兜底 | 搁置；当前先验证成熟模型的 tool calling |
+| D6 确定性优先、LLM 最后接 | 搁置；已经直接用真模型跑通 |
+| D9 无 GPU 机器不装 Ollama、用 StubProvider | 代码保留，作为测试替身 |
+| D12 每个 Tool 带 `risk_level` | 高危确认仍需实现，具体由项目权限策略控制 |
+| D7 HA 配置用 named volume | 已改为 bind mount |
+| 原 Phase 4–10 自研工具 / 路由 / 记忆 / UI | 搁置 |
 
 ---
 
-## 5. 虚拟家庭
+## 6. 仓库中现有代码
 
-全部定义在 `homeassistant/config/packages/virtual_home.yaml`，由 `input_boolean` / `input_number` 作为状态载体，`template:` 平台派生出带真实 domain 的实体。
+| 模块 | 内容 | 当前定位 |
+|---|---|---|
+| `config.py` / `logging.py` / `main.py` | 配置、结构化日志、FastAPI 与 `/api/health` | Python 服务骨架 |
+| `ha/client.py` | `HomeAssistantClient`：REST、超时、重试、错误映射；尚无 WebSocket | 可包成 MCP server 或插件后端，待定 |
+| `ha/mock_client.py` | 测试替身 | 保留 |
+| `home/topology.py` + `config/home_topology.yaml` | 房间与设备映射 | 当前插件是否使用待定 |
+| `llm/` | `LLMProvider` 协议与 `StubProvider` | 暂时不是主要运行路径，保留 |
+| `evals/cases.yaml` | 36 条评测集 | 后续可复用 |
+| `homeassistant/config/packages/virtual_home.yaml` | 21 个虚拟设备 | 当前核心测试床 |
+
+---
+
+## 7. 虚拟家庭
+
+全部定义在 `homeassistant/config/packages/virtual_home.yaml`，由 `input_boolean` / `input_number` / `input_select` 作为状态载体，派生出带真实 domain 的实体。
 
 | 房间 | 设备 |
 |---|---|
@@ -213,149 +227,189 @@ UI 四个区块：聊天 / 当前家庭状态 / 事件日志 / 系统状态（JA
 | 玄关 | 前门锁、存在传感器 |
 | 全屋 | 扫地机器人 |
 
+完整清单见 [`VIRTUAL_HOME.md`](VIRTUAL_HOME.md)。
+
 关键点：
 
-- 保留**真实的 domain**（`light` / `climate` / `cover` / `media_player` / `lock` / `vacuum` / `sensor`），而不是全用 `switch`。这样换真实设备时 service 调用形态不变
-- `cover` / `lock` / `vacuum` 的 template 平台需要配合 `script` 与 `value_template`，是本阶段主要工作量
-- **不提交** HA 的 `.storage/`、数据库、日志
+- 保留真实 domain（`light` / `climate` / `cover` / `media_player` / `lock` / `vacuum` / `sensor`），换真实设备时 service 调用形态尽量不变。
+- 空调用 `generic_thermostat`，电视用 `template switch`，其余用 `template`。
+- 不提交 HA 的 `.storage/`、数据库和日志。
+- 已知问题：客厅灯关闭时，带亮度调用 `light.turn_on` 只会改亮度，不会把灯打开；尚未修复。
 
 ---
 
-## 6. 场景
+## 8. 插件约定（初版）
 
-场景**必须是确定性的**，由 `config/scenes.yaml` 定义，由应用代码执行。
+每个插件应：
 
-内置场景：`HOME` / `MOVIE` / `SLEEP` / `MORNING` / `AWAY`。
+1. 独立成包，不依赖某个 Harness 的内部模块。
+2. 对模型暴露工具名、说明文字和参数 JSON Schema。
+3. 返回结构化结果（如 `{ok, ...}` 或 `{ok: false, error}`），不直接返回自然语言。
+4. 不包含 JARVIS 身份、人设或个人习惯。
+5. 从环境变量或 `.env` 读取密钥，不硬编码。
+6. 可单独测试，不启动 Harness 也能调用核心工具函数。
+7. 对外部系统实施必要的超时、错误映射和输入校验。
+8. 不可用时返回明确错误，不把失败伪装成成功。
 
-**LLM 的工作只是：识别用户想触发哪个场景 → 调用 `activate_scene(name=...)`。**
-绝不允许 LLM 为某个场景即兴编造动作序列。
-
----
-
-## 7. 可观测性
-
-每个请求生成 `request_id` 并贯穿全链路。可查看：
-
-```
-用户请求 → 识别到的意图 → 调用的工具 → 参数 → 执行结果 → 最终回复
-```
-
-- 链路写入 `traces` 表，并可通过 SSE 实时推给 UI
-- 结构化日志（含 `request_id`）
-- **不记录、不展示模型的思维链**
+不同 Harness 的协议差异由薄适配层处理。插件公共契约应尽量小，避免为了抽象而抽象。
 
 ---
 
-## 8. 错误处理与降级
+## 9. Identity、Context 与 Permissions
 
-| 故障 | 表现 | 要求 |
+### 9.1 Identity
+
+Identity 描述 JARVIS 是谁、如何沟通、遵循什么基本行为原则。它不应该散落在各个插件里。
+
+当前先通过 Harness 启动时注入 system prompt。内容可分为：
+
+- 人设：身份、表达方式、基本行为准则。
+- 环境：当前家庭结构、可用设备等相关信息。
+- 习惯：用户明确提供且适合长期使用的偏好。
+
+从 DSH 应用里的实测看，有两条行为准则值得写进人设：**拿不准先问再做**（「我好热」→ 给出选项），**做完读回状态再回复**。前者让体验像管家，后者是后面权限与核验的基础。
+
+### 9.2 Context
+
+Context 是完成当前任务所需的动态信息。家庭设备清单等容易变化的信息，不应长期硬编码在静态 prompt 中。
+
+当前阶段可先使用静态信息完成最小闭环；后续应评估从 HA 或 Context Provider 动态获取相关信息。只向模型提供当前任务需要的上下文，避免无差别塞入全部元数据。
+
+### 9.3 Permissions
+
+权限必须由代码执行层落实，而不是只写在 prompt 中。
+
+- 普通读操作可按插件策略开放。
+- 普通设备控制按明确的允许范围执行。
+- 高风险操作（如门锁）需要显式确认。
+- 插件不得因模型要求而绕过权限策略。
+- 权限检查应独立于 Harness，避免更换 Runtime 后安全规则失效。
+
+**当前状态：尚未实现。** spike 插件的 `home_call_service` 接受任何 domain 和 service，包括 `lock.unlock`，没有任何确认。
+
+### 9.4 暂不建设的部分
+
+Memory 和复杂 Task State 是长期架构中的可能模块，但当前不实现。先验证用户发起任务的闭环，再根据实际需求决定记忆内容、生命周期和存储方式。
+
+---
+
+## 10. 模型与评测
+
+- 当前 spike 使用 DeepSeek API。
+- 后续可以评估其他 API 模型或本地模型。
+- 模型更换不应要求重写插件，但会影响工具选择、参数准确性、速度、成本和上下文预算。
+- **模型可替换不等于模型行为等价**：每次更换模型或重大升级后，都应运行同一套 evals，比较工具选择、参数、权限遵守和任务结果。
+- 此前讨论过的方向是在 Mac Studio 上跑约 70B（fp8）的本地模型。它不构成当前架构依赖，也不为某个预设模型尺寸提前设计复杂系统。
+
+---
+
+## 11. Harness Spike 记录（DSH，2026-11-27）
+
+目的：验证「现成 Harness + 插件」路线是否可行。
+
+插件位于 `D:\dsh-plugins\dsh-plugin-home`，`lib/index.js` 约 190 行，零依赖。
+
+| 工具 | 作用 |
+|---|---|
+| `home_list_entities` | 列出设备，可按 domain 过滤 |
+| `home_get_state` | 读取实体状态 |
+| `home_call_service` | 调用 HA 服务，返回受影响实体 |
+
+令牌读取顺序：环境变量 `JARVIS_HA_TOKEN` → `envFile`（`D:/Desktop/Jarvis/.env`）中同名配置。每次调用现读，换令牌不用重启。
+
+| 验证点 | 结果 | 证据 |
 |---|---|---|
-| HA 不可用 | 系统状态显示 `Home Assistant: DISCONNECTED` | JARVIS 继续运行，工具返回结构化错误 |
-| Ollama 不可用 | 系统状态显示 `LLM: DISCONNECTED` | 自动回落到 `RuleStrategy`，基础指令仍然可用 |
-| 非法房间/设备 | 返回结构化错误 | 不抛异常，不崩溃 |
-| 模型输出非法参数 | Pydantic 校验失败 | 有限重试，仍失败则返回友好错误 |
+| 插件调用外部服务 | PASS | 模型列设备、执行 `turn_off`、读状态；另直接查 HA 确认灯已关 |
+| 无界面后台运行 | PASS，有限制 | `dsh --profile headless "任务"` 不开端口，约 5 秒退出；一个进程只跑一个任务，不是常驻服务 |
+| 接入现有 Python HA client | 未验证 | DSH 有 MCP 客户端；Python client 如何接入仍待验证 |
+| 桌面应用可用 | PASS | 打开所有灯、对「我好热」给选项、设置空调温度并读回状态 |
 
-原则：**任何外部服务故障都不能让整个应用崩溃。** 所有外部调用必须有超时。
+DSH 已知限制：
 
----
+- headless 默认关闭本地凭据，测试时使用临时 overlay 或 `DEEPSEEK_API_KEY`。
+- 桌面应用只认 desktop profile；插件需要配置 `dependencies` 和 `dsh.profile.bundles`。
+- 应用内安装插件只进入 `dependencies`，不进入 `bundles`，可能导致应用内不生效。
+- 一轮对话约 203K token，主要来自 DSH 自带的编码类系统提示；常驻版需要裁掉不需要的工具。
 
-## 9. 安全
-
-- 源码中不含任何密钥、令牌、密码；`.env` 不提交
-- HA 令牌通过环境变量注入
-- 高危工具（如 `unlock_front_door`）标记 `CONFIRM_REQUIRED`，走确认接口
-  - MVP 通过 `CONFIRM_HIGH_RISK=false` 关闭确认，但**接口与调用路径完整保留**
-- 不提交：`.env`、数据库、日志、缓存、模型文件、Docker volume、`__pycache__`
+改动留痕：插件已 link 进 `headless` 和 `desktop` 两个 profile。desktop 的 `package.json` 和 `pnpm-lock.yaml` 改之前有 `.bak` 备份。
 
 ---
 
-## 10. 配置与可移植性
+## 12. 配置与可移植性
 
-### 环境变量
+环境变量统一使用 `JARVIS_` 前缀。
 
-| 变量 | 说明 | 无 GPU 开发机 | 带 GPU 机器 |
-|---|---|---|---|
-| `JARVIS_ENV` | `dev` / `prod` | `dev` | `dev` |
-| `JARVIS_HOST` / `JARVIS_PORT` | 服务监听 | `127.0.0.1` / `8000` | 同左 |
-| `HA_URL` | HA 地址 | `http://localhost:8123` | 同左 |
-| `HA_TOKEN` | HA 长期访问令牌 | 各自生成，**不提交** | 各自生成，**不提交** |
-| `LLM_PROVIDER` | `stub` / `ollama` | **`stub`** | `ollama` |
-| `OLLAMA_URL` | Ollama 地址 | 未使用 | `http://localhost:11434` |
-| `MODEL_NAME` | 模型名 | 未使用 | 例如 `qwen2.5:7b-instruct` |
-| `DATABASE_URL` | SQLite 路径 | `sqlite:///./data/jarvis.db` | 同左（相对路径） |
-| `CONFIRM_HIGH_RISK` | 高危操作确认开关 | `false` | `false` |
-| `LOG_LEVEL` | 日志级别 | `DEBUG` | `INFO` |
+| 变量 | 说明 |
+|---|---|
+| `JARVIS_ENV` | `dev` / `prod` |
+| `JARVIS_HOST` / `JARVIS_PORT` | Python 服务监听地址 |
+| `JARVIS_HA_URL` | HA 地址，默认 `http://localhost:8123` |
+| `JARVIS_HA_TOKEN` | HA 长期访问令牌，不提交 |
+| `JARVIS_HA_TIMEOUT_SECONDS` | HA 请求超时 |
+| `JARVIS_LLM_PROVIDER` | `stub` / `ollama` |
+| `JARVIS_OLLAMA_URL` / `JARVIS_MODEL_NAME` | Ollama 配置 |
+| `JARVIS_DATABASE_PATH` | SQLite 路径 |
+| `JARVIS_CONFIRM_HIGH_RISK` | 高风险操作确认开关 |
+
+完整说明见 `.env.example`。
 
 ### 禁止硬编码
 
-文件系统绝对路径、用户名、IP 地址、机器专属配置、GPU 假设、API key、密码、HA token —— 全部走环境变量或配置文件。
-
-### 换机初始化
-
-```bash
-git clone <repo>
-cd jarvis
-./scripts/setup.sh          # 建 venv、装依赖、生成 .env
-docker compose up -d        # 起 Home Assistant
-# 浏览器打开 HA，创建长期访问令牌，填入 .env 的 HA_TOKEN
-uv run uvicorn jarvis.main:app --reload
-```
-
-Ollama 为可选项：需要真模型时安装本机 Ollama 并 `./scripts/pull_model.sh`，然后把 `LLM_PROVIDER` 改成 `ollama`。
+文件系统绝对路径、用户名、IP 地址、机器专属配置、API key、密码和 HA token，全部走环境变量或本地配置文件。
 
 ### 跨平台注意
 
 | 问题 | 处理 |
 |---|---|
 | Shell 脚本换行符 | `.gitattributes` 强制 `*.sh` 为 LF |
-| Windows 路径 | 全部使用 `pathlib` 与相对路径 |
-| HA 在 Windows | 只能跑在容器里；配置用 named volume 而非 bind mount |
-| Docker GPU 直通 | Compose 中用 profile + 可选 device reservation，无 GPU 机器不启用 |
+| Windows 路径 | 使用 `pathlib` 与相对路径 |
+| HA 在 Windows | 当前通过容器运行 |
+| Docker GPU 直通 | Compose profile 控制，无 GPU 机器不启用 |
+
+### 数据与状态迁移
+
+- 代码、可复现配置和虚拟家庭定义可通过 Git 同步。
+- 密钥和机器专属配置留在本地。
+- 数据库、私人对话和个人记忆不默认进入 Git。
+- 未来若迁移存储，需明确导出格式、版本和恢复流程；当前不提前建设。
 
 ---
 
-## 11. 决策记录（摘要）
+## 13. 安全
 
-| 编号 | 主题 | 结论 |
-|---|---|---|
-| D1 | 虚拟设备实现 | YAML template 实体（非 MQTT 模拟器、非 UI 手建） |
-| D2 | 设备映射 | `home_topology.yaml` 单一真相 |
-| D3 | 意图路由 | 规则优先 + LLM 兜底 |
-| D4 | LLM 抽象时机 | Phase 1，配 StubProvider |
-| D6 | 实现顺序 | 确定性优先，LLM 最后接 |
-| D8 | 开发运行方式 | 代码本机跑，Docker 只装 HA |
-| D9 | 无 GPU 机器的 Ollama | 不装，用 StubProvider |
-| D10 | 记忆同步 | 不同步，各机器独立 |
-| — | 前端 | 静态单页 + 原生 JS，无构建步骤 |
-| — | 依赖管理 | `uv` + `uv.lock`，同时导出 `requirements.txt` 作为退路 |
+- 源码不含密钥、令牌和密码；`.env` 不提交。
+- 模型拿不到 HA 地址和令牌，只能调用结构化工具。
+- 高风险操作需要代码层权限检查与确认（尚未实现）。
+- 外部输入和模型生成的工具参数都需要校验。
+- 不提交 `.env`、数据库、日志、缓存、Docker volume 和 `__pycache__`。
 
 ---
 
-## 12. 风险登记
+## 14. 风险登记
 
 | 风险 | 等级 | 缓解措施 |
 |---|---|---|
-| CPU-only 小模型 tool calling 不可靠 | **高** | 双路由（规则兜底）+ Pydantic 校验重试 + provider 接口预留未来换更好的模型 |
-| 无 GPU 机器上推理极慢 | 中 | 该机器用 `stub` 开发；真模型只在带 GPU 机器上验证 |
-| HA template 的 `cover`/`lock`/`vacuum` 有坑 | 中 | 需要 `script` + `value_template` 配合；预留充足调试时间 |
-| HA 在 WSL2 下 SQLite 性能/损坏 | 中 | 用 named volume，不用 bind mount |
-| HA 首次启动慢（1–3 分钟）、镜像约 1.5GB | 低 | 文档中说明；健康检查加长超时 |
-| Ollama 冷启动首 token 10–30 秒 | 低 | UI 做流式状态提示 |
-| Docker Desktop 商业授权 | 低（需确认） | 有顾虑时改用 WSL2 内免费 Docker Engine |
-| SQLite 并发写 | 低 | WAL + 单写者 |
-| 带 thinking 的模型污染结构化输出 | 中 | 调用时显式关闭思考模式 |
+| Harness 处于 preview，接口可能变化 | 高 | 自定义插件公共契约，Harness 适配层保持薄 |
+| Harness 停更或闭源 | 中 | 保持可替换；阶段 2 评估备选 |
+| 模型升级导致工具行为变化 | 中 | 固定 evals，升级后回归测试 |
+| 模型误操作设备 | 中 | 代码层权限策略、高风险确认、执行后读回 |
+| 插件故障影响整体服务 | 中 | 超时、错误隔离、独立健康状态与降级 |
+| DSH headless 不是常驻服务 | 中 | 阶段 5 验证常驻服务方案 |
+| 音箱路径未定 | 中 | 先用文字入口，见 `PHASES.md` |
+| HA template 灯问题 | 低 | 已知问题，待修 |
+| Docker Desktop 商业授权 | 低 | 有顾虑时评估 WSL2 Docker Engine |
 
 ---
 
-## 13. 未来扩展路径
+## 15. 待定问题
 
-架构需保证以下替换**不需要重写 Agent 与 Tool 层**：
-
-| 现在 | 将来 | 改动点 |
-|---|---|---|
-| 虚拟灯（template） | 真实智能灯 | `home_topology.yaml` + HA 配对 |
-| 虚拟传感器 | 真实传感器 | 同上 |
-| Web 聊天 | 成品音箱（Siri 快捷指令 / 小爱）作为输入适配器 | 文字进、一句回复出的对话接口（Phase 10），Agent 接口不变 |
-| 本机 PC | 专用 AI 服务器 / GPU 服务器 | `OLLAMA_URL` + `MODEL_NAME` |
-| 虚拟扫地机 | 真实扫地机 | `home_topology.yaml` + HA 集成 |
-| 虚拟 HA | 真实 HA 安装 | `HA_URL` + `HA_TOKEN` |
+| 问题 | 现状 |
+|---|---|
+| 最终 Harness | DSH spike 通过；pi 等尚未评估 |
+| 插件正式放置位置 | 当前在 `D:\dsh-plugins`，仓库内或独立包待定 |
+| Python HA client 如何接入 | MCP server 或其他适配方式待定 |
+| 家庭 Context 如何提供 | 静态 prompt 先行；动态获取待评估 |
+| 常驻形态 | 当前 headless 一进程一任务，需要验证服务形态 |
+| 音箱路径 | 米家场景、社区项目、小爱开放平台等候选 |
+| 高风险确认机制 | 需要独立于 Harness 的权限实现；放在插件里做最省事，因为插件是设备前的最后一道关，且天然不依赖 Harness（建议，未定） |
+| Memory 方案 | 暂缓，等出现明确需求再评估 |
