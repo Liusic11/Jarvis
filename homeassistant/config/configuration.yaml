@@ -18,6 +18,16 @@ homeassistant:
   # packages 目录下的每个 .yaml 都会作为「包」合并进来。
   packages: !include_dir_named packages
 
+# 侧边栏里的「全屋」面板：户型图 + 设备图标，定义在 dashboards/floorplan.yaml
+lovelace:
+  dashboards:
+    lovelace-floorplan:
+      mode: yaml
+      filename: dashboards/floorplan.yaml
+      title: 全屋
+      icon: mdi:floor-plan
+      show_in_sidebar: true
+
 logger:
   default: info
   logs:

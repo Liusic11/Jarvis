@@ -139,6 +139,8 @@ docker compose ps            # 等状态变成 healthy（首次约 1–3 分钟�
 
 首次启动后打开 <http://localhost:8123> 完成 HA 引导（左下角用户名 → 安全 → 创建令牌），并将长期访问令牌写入本地 `.env` 的 `JARVIS_HA_TOKEN`。
 
+左侧栏的「全屋」是平面图面板，图标位置在 `homeassistant/config/dashboards/floorplan.yaml` 里改，文件头有坐标换算公式。
+
 ### 3. 启动 Python 服务
 
 ```bash
@@ -167,13 +169,20 @@ docker compose down                    # 停 HA（配置保留在宿主机 homea
 ## 仓库结构
 
 ```text
-homeassistant/    HA 配置与 virtual_home.yaml
+homeassistant/config/
+  configuration.yaml       HA 入口配置
+  packages/virtual_home.yaml   虚拟家庭（21 个设备）
+  dashboards/floorplan.yaml    「全屋」平面图面板
+  www/floorplan.svg            平面图线稿底图
 config/           home_topology.yaml
 src/jarvis/       Python 服务
 tests/            单元测试与集成测试
 evals/            评测集
 scripts/          初始化、校验与辅助脚本
 docs/             架构、阶段计划与学习笔记
+docs/research/    调研笔记
+docs/learn/       每个阶段的学习笔记
+docs/archive/     已归档的历史计划
 ```
 
 home 插件 spike 当前位于仓库外：`D:\dsh-plugins\dsh-plugin-home`；正式放置位置待定。

@@ -1,0 +1,105 @@
+# 全屋平面图面板
+#
+# 底图：www/floorplan.svg，按原始户型图手绘的线稿（viewBox 60 100 556 436）。
+# 图标坐标换算：left = (x - 60) / 556，top = (y - 100) / 436，x/y 是 SVG 里的坐标。
+# 房间和虚拟设备的对应关系（第一版，按位置近似）：
+#   客餐厅 ← living_room      主卧 ← bedroom
+#   右侧卧室 ← study          厨房 ← kitchen
+#   右下入口走廊 ← entrance（入户门位置是推测）
+# 户型图里另外两个卧室、两个卫生间、两个阳台暂时没有对应设备。
+title: 全屋
+views:
+  - title: 全屋
+    path: floorplan
+    icon: mdi:floor-plan
+    panel: true
+    cards:
+      - type: picture-elements
+        image: /local/floorplan.svg
+        elements:
+          # ── 客餐厅（living_room）──
+          - type: state-icon
+            entity: binary_sensor.living_room_presence
+            style: &icon
+              left: 61.2%
+              top: 45.9%
+              background: rgba(255,255,255,0.95)
+              border-radius: 50%
+              padding: 4px
+              box-shadow: 0 1px 4px rgba(0,0,0,0.18)
+              --mdc-icon-size: 22px
+          - type: state-icon
+            entity: light.living_room_light
+            style: { <<: *icon, left: 69.2%, top: 45.9% }
+          - type: state-icon
+            entity: climate.living_room_ac
+            style: { <<: *icon, left: 77.3%, top: 45.9% }
+          - type: state-icon
+            entity: switch.living_room_tv
+            style: { <<: *icon, left: 85.4%, top: 45.9% }
+          - type: state-label
+            entity: sensor.living_room_temperature
+            style: &label
+              left: 69.2%
+              top: 53.9%
+              background: rgba(255,255,255,0.92)
+              border-radius: 12px
+              padding: 2px 8px
+              color: '#333333'
+              font-size: 13px
+          - type: state-icon
+            entity: vacuum.robot_vacuum
+            style: { <<: *icon, left: 89.9%, top: 56.2% }
+          - type: state-icon
+            entity: cover.living_room_curtain
+            style: { <<: *icon, left: 65.3%, top: 73.4% }
+
+          # ── 主卧（bedroom）──
+          - type: state-icon
+            entity: light.bedroom_light
+            style: { <<: *icon, left: 18.9%, top: 63.1% }
+          - type: state-icon
+            entity: climate.bedroom_ac
+            style: { <<: *icon, left: 29.7%, top: 63.1% }
+          - type: state-icon
+            entity: binary_sensor.bedroom_presence
+            style: { <<: *icon, left: 40.5%, top: 63.1% }
+          - type: state-label
+            entity: sensor.bedroom_temperature
+            style: { <<: *label, left: 29.7%, top: 70.0% }
+          - type: state-icon
+            entity: cover.bedroom_curtain
+            style: { <<: *icon, left: 22.1%, top: 73.4% }
+
+          # ── 右侧卧室（study）──
+          - type: state-icon
+            entity: light.study_light
+            style: { <<: *icon, left: 64.8%, top: 20.6% }
+          - type: state-icon
+            entity: climate.study_ac
+            style: { <<: *icon, left: 70.9%, top: 20.6% }
+          - type: state-icon
+            entity: binary_sensor.study_presence
+            style: { <<: *icon, left: 77.0%, top: 20.6% }
+          - type: state-label
+            entity: sensor.study_temperature
+            style: { <<: *label, left: 70.9%, top: 28.0% }
+
+          # ── 厨房（kitchen）──
+          - type: state-icon
+            entity: light.kitchen_light
+            style: { <<: *icon, left: 85.4%, top: 21.8% }
+          - type: state-icon
+            entity: binary_sensor.kitchen_presence
+            style: { <<: *icon, left: 92.6%, top: 21.8% }
+          - type: state-label
+            entity: sensor.kitchen_temperature
+            style: { <<: *label, left: 89.0%, top: 28.7% }
+
+          # ── 玄关（entrance）──
+          - type: state-icon
+            entity: lock.front_door
+            style: { <<: *icon, left: 86.3%, top: 88.3% }
+          - type: state-icon
+            entity: binary_sensor.entrance_presence
+            style: { <<: *icon, left: 93.2%, top: 88.3% }
